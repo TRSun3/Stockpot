@@ -56,7 +56,16 @@ def test_logging_out_ends_the_session_even_for_a_copied_cookie(neal):
 
 
 def test_protected_routes_answer_401_without_a_session(client):
-    for method, path in [("get", "/api/me")]:
+    for method, path in [
+        ("get", "/api/me"),
+        ("get", "/api/items"),
+        ("post", "/api/items"),
+        ("get", "/api/items/expiring"),
+        ("patch", "/api/items/1"),
+        ("delete", "/api/items/1"),
+        ("get", "/api/shopping"),
+        ("post", "/api/shopping"),
+    ]:
         response = client.request(method, path)
         assert response.status_code == 401, path
         assert response.json() == {"error": "Please log in."}

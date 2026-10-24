@@ -12,3 +12,37 @@ Every route is JSON under `/api`. Errors come back as `{"error": "a readable mes
 | GET | `/api/me` | `{username, llm}`, where `llm` is `mock` or `gemini` |
 
 Usernames are 3 to 32 letters, digits, `_`, `.`, or `-`, unique regardless of case. Passwords are 6 to 128 characters. Logging in sets an `HttpOnly`, `SameSite=Lax` cookie named `stockpot_session`. Each browser holds its own cookie, so a normal window and a private window can be logged in as different people at once.
+
+## Pantry
+
+| Method | Path | Does |
+|---|---|---|
+| GET | `/api/items` | Every item, soonest to expire first, items without an expiry last |
+| POST | `/api/items` | `{name, description?, expires_on?}` adds one item (201) |
+| GET | `/api/items/expiring?days=3` | The Use Soon list: items expiring within `days` (0 to 60), plus everything already expired |
+| GET | `/api/items/{id}` | One item |
+| PATCH | `/api/items/{id}` | Changes only the fields sent. `"expires_on": null` clears the expiry |
+| DELETE | `/api/items/{id}` | Discards an item, whether used up or thrown out |
+
+An item comes back as `{id, name, description, expires_on, status, days_left, updated_at}`. `days_left` counts from today and goes negative once the item has expired. `status` is one of:
+
+| Status | Means |
+|---|---|
+| `expired` | Past its date |
+| `today` | Expires today |
+| `soon` | Expires within 3 days |
+| `fresh` | More than 3 days left |
+| `none` | No expiry, like rice or salt |
+
+Names are 1 to 80 characters and descriptions up to 500. An item that belongs to another account answers 404, the same as one that doesn't exist.
+
+## Shopping List
+
+| Method | Path | Does |
+|---|---|---|
+| GET | `/api/shopping` | The list, unchecked entries first, each group in the order added |
+| POST | `/api/shopping` | `{name, note?}` adds an entry (201) |
+| PATCH | `/api/shopping/{id}` | `{name?, note?, checked?}` changes only the fields sent |
+| DELETE | `/api/shopping/{id}` | Removes an entry |
+
+An entry comes back as `{id, name, note, checked}`.

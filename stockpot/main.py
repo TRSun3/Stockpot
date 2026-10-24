@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from stockpot import auth, config, db
+from stockpot import auth, config, db, pantry, shopping
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 
@@ -51,7 +51,8 @@ def create_app(settings: config.Settings | None = None, llm=None) -> FastAPI:
     def health() -> dict:
         return {"ok": True}
 
-    app.include_router(auth.router)
+    for module in (auth, pantry, shopping):
+        app.include_router(module.router)
     app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
     return app
 
