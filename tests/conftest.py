@@ -12,6 +12,19 @@ from stockpot.main import create_app
 TODAY = date(2026, 10, 24)
 
 
+def pytest_addoption(parser):
+    parser.addoption("--browser", action="store_true", help="also drive the running app in Edge")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--browser"):
+        return
+    skip = pytest.mark.skip(reason="drives a real browser; runs only with --browser")
+    for item in items:
+        if "browser" in item.keywords:
+            item.add_marker(skip)
+
+
 @pytest.fixture
 def settings(tmp_path):
     return config.Settings(

@@ -21,6 +21,7 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = [".", "tests"]
 testpaths = ["tests"]
+markers = ["browser: drives the running app in Edge; runs only with --browser"]
 filterwarnings = [
     "error",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
