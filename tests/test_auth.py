@@ -13,6 +13,7 @@ def log_in(client, username, password):
 def test_signing_up_logs_the_new_account_in(client):
     response = client.post("/api/auth/signup", json={"username": "neal", "password": "password1"})
     assert response.status_code == 201
+    assert response.json() == {"username": "neal", "llm": "mock"}
     cookie = response.headers["set-cookie"].lower()
     assert "stockpot_session=" in cookie and "httponly" in cookie and "samesite=lax" in cookie
     assert client.get("/api/me").json() == {"username": "neal", "llm": "mock"}

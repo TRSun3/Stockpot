@@ -76,23 +76,28 @@ def current_user(request: Request, conn: Conn) -> User:
 CurrentUser = Annotated[User, Depends(current_user)]
 
 
+def profile(request: Request, user: User) -> dict:
+    """Who is logged in and which LLM backend answers them; signup, login, and /api/me all return this."""
+    return {"username": user.username, "llm": request.app.state.settings.backend}
+
+
 @router.post("/auth/signup", status_code=201)
-def signup(body: Credentials, response: Response, conn: Conn) -> dict:
+def signup(body: Credentials, request: Request, response: Response, conn: Conn) -> dict:
     try:
         user = create_user(conn, body.username, body.password)
     except ValueError as error:
         raise HTTPException(409, str(error)) from None
     start_session(conn, user, response)
-    return {"username": user.username}
+    return profile(request, user)
 
 
 @router.post("/auth/login")
-def login(body: Credentials, response: Response, conn: Conn) -> dict:
+def login(body: Credentials, request: Request, response: Response, conn: Conn) -> dict:
     user = verify(conn, body.username, body.password)
     if user is None:
         raise HTTPException(401, "Wrong username or password.")
     start_session(conn, user, response)
-    return {"username": user.username}
+    return profile(request, user)
 
 
 @router.post("/auth/logout")
@@ -106,4 +111,4 @@ def logout(request: Request, response: Response, conn: Conn) -> dict:
 
 @router.get("/me")
 def me(request: Request, user: CurrentUser) -> dict:
-    return {"username": user.username, "llm": request.app.state.settings.backend}
+    return profile(request, user)

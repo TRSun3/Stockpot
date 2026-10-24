@@ -6,8 +6,8 @@ Every route is JSON under `/api`. Errors come back as `{"error": "a readable mes
 
 | Method | Path | Does |
 |---|---|---|
-| POST | `/api/auth/signup` | `{username, password}` creates an account and logs it in (201). 409 if the username is taken |
-| POST | `/api/auth/login` | `{username, password}` logs in. 401 on a wrong username or password |
+| POST | `/api/auth/signup` | `{username, password}` creates an account and logs it in (201), returning the same `{username, llm}` as `/api/me`. 409 if the username is taken |
+| POST | `/api/auth/login` | `{username, password}` logs in and returns `{username, llm}`. 401 on a wrong username or password |
 | POST | `/api/auth/logout` | Ends the session and clears the cookie |
 | GET | `/api/me` | `{username, llm}`, where `llm` is `mock` or `gemini` |
 

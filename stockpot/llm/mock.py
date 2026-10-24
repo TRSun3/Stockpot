@@ -722,7 +722,8 @@ class Mock(LLM):
         if soon:
             soon.sort()
             names = [name for _, name in soon]
-            pronoun = "it turns" if len(names) == 1 else "they turn"
+            plural = len(names) > 1 or names[0].endswith("s") and not names[0].endswith("ss")
+            pronoun = "they turn" if plural else "it turns"
             return f"Uses your {join(names)} before {pronoun} {turns_phrase(soon[0][0])}."
         if not uses:
             return "You'd need to shop for this one."
