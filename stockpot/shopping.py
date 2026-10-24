@@ -30,9 +30,7 @@ def row(conn: sqlite3.Connection, user_id: int, entry_id: int) -> sqlite3.Row | 
 
 
 def insert(conn: sqlite3.Connection, user_id: int, name: str, note: str = "") -> int:
-    cursor = conn.execute(
-        "INSERT INTO shopping_items (user_id, name, note) VALUES (?, ?, ?)", (user_id, name, note)
-    )
+    cursor = conn.execute("INSERT INTO shopping_items (user_id, name, note) VALUES (?, ?, ?)", (user_id, name, note))
     return cursor.lastrowid
 
 

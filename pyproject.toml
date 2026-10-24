@@ -19,15 +19,16 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "tests"]
 testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+    "ignore:'_UnionGenericAlias' is deprecated and slated for removal in Python 3.17:DeprecationWarning",
 ]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py314"
 
 [tool.ruff.lint]

@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from stockpot import config
+from stockpot.llm.mock import Mock
 from stockpot.main import create_app
 
 TODAY = date(2026, 10, 24)
@@ -20,7 +21,7 @@ def settings(tmp_path):
 
 @pytest.fixture
 def app(settings):
-    app = create_app(settings)
+    app = create_app(settings, llm=Mock(delay=0))
     app.state.today = lambda: TODAY
     return app
 

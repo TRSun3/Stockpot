@@ -36,6 +36,17 @@ An item comes back as `{id, name, description, expires_on, status, days_left, up
 
 Names are 1 to 80 characters and descriptions up to 500. An item that belongs to another account answers 404, the same as one that doesn't exist.
 
+### In Plain Words
+
+| Method | Path | Does |
+|---|---|---|
+| POST | `/api/items/parse` | `{text}` like "a dozen eggs and some spinach" adds each grocery with an estimated expiry, and returns the new items (201). 422 when the text names no food |
+| POST | `/api/items/adjust` | `{text}` like "I used half the milk" changes the pantry to match. Returns `{changes, rejected}` |
+
+`changes` lists what happened, each as `{action: added | updated | removed, item_id, name, description?}`, so the page can say "Updated milk, removed eggs". `rejected` lists every change the LLM proposed that was refused, each with a `reason`. See [LLM.md](LLM.md) for the rules.
+
+When the LLM fails, these routes and every other AI route answer 502 with a friendly message and change nothing.
+
 ## Shopping List
 
 | Method | Path | Does |
@@ -44,5 +55,6 @@ Names are 1 to 80 characters and descriptions up to 500. An item that belongs to
 | POST | `/api/shopping` | `{name, note?}` adds an entry (201) |
 | PATCH | `/api/shopping/{id}` | `{name?, note?, checked?}` changes only the fields sent |
 | DELETE | `/api/shopping/{id}` | Removes an entry |
+| POST | `/api/shopping/move-to-pantry` | Moves every checked entry into the pantry with an estimated expiry, and returns `{moved: [items]}`. 400 when nothing is checked |
 
 An entry comes back as `{id, name, note, checked}`.

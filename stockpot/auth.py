@@ -43,9 +43,7 @@ def create_user(conn: sqlite3.Connection, username: str, password: str) -> User:
 
 
 def verify(conn: sqlite3.Connection, username: str, password: str) -> User | None:
-    row = conn.execute(
-        "SELECT id, username, password_hash, salt FROM users WHERE username = ?", (username,)
-    ).fetchone()
+    row = conn.execute("SELECT id, username, password_hash, salt FROM users WHERE username = ?", (username,)).fetchone()
     if row is None or not hmac.compare_digest(hash_password(password, row["salt"]), row["password_hash"]):
         return None
     return User(row["id"], row["username"])

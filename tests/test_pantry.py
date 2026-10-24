@@ -11,9 +11,7 @@ def day(offset):
 
 
 def add(client, name, expires_on=None, description=""):
-    response = client.post(
-        "/api/items", json={"name": name, "description": description, "expires_on": expires_on}
-    )
+    response = client.post("/api/items", json={"name": name, "description": description, "expires_on": expires_on})
     assert response.status_code == 201, response.text
     return response.json()
 

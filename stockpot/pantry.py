@@ -4,17 +4,15 @@ import sqlite3
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from stockpot.auth import Conn, CurrentUser
-from stockpot.deps import get_today
-from stockpot.schemas import ItemIn, ItemPatch
+from stockpot.deps import Today
+from stockpot.schemas import ItemIn, ItemPatch, PantryItem
 
 SOON_DAYS = 3
 
 router = APIRouter(prefix="/api/items")
-
-Today = Annotated[date, Depends(get_today)]
 
 
 def freshness(expires_on: date | None, today: date) -> tuple[str, int | None]:
@@ -52,15 +50,18 @@ def rows(conn: sqlite3.Connection, user_id: int) -> list[sqlite3.Row]:
     return conn.execute(f"SELECT {COLUMNS} FROM items WHERE user_id = ? {ORDER}", (user_id,)).fetchall()
 
 
+def for_llm(conn: sqlite3.Connection, user_id: int) -> list[PantryItem]:
+    return [
+        PantryItem(id=item["id"], name=item["name"], description=item["description"], expires_on=item["expires_on"])
+        for item in rows(conn, user_id)
+    ]
+
+
 def row(conn: sqlite3.Connection, user_id: int, item_id: int) -> sqlite3.Row | None:
-    return conn.execute(
-        f"SELECT {COLUMNS} FROM items WHERE id = ? AND user_id = ?", (item_id, user_id)
-    ).fetchone()
+    return conn.execute(f"SELECT {COLUMNS} FROM items WHERE id = ? AND user_id = ?", (item_id, user_id)).fetchone()
 
 
-def insert(
-    conn: sqlite3.Connection, user_id: int, name: str, description: str, expires_on: date | None
-) -> int:
+def insert(conn: sqlite3.Connection, user_id: int, name: str, description: str, expires_on: date | None) -> int:
     cursor = conn.execute(
         "INSERT INTO items (user_id, name, description, expires_on) VALUES (?, ?, ?, ?)",
         (user_id, name, description, expires_on.isoformat() if expires_on else None),
