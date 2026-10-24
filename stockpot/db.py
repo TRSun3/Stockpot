@@ -47,7 +47,22 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS preferences (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    notes      TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS saved_recipes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title      TEXT NOT NULL,
+    recipe     TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_items_user ON items(user_id, expires_on);
+CREATE INDEX IF NOT EXISTS idx_saved_user ON saved_recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_shopping_user ON shopping_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id, id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);

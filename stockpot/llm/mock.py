@@ -609,6 +609,27 @@ MOODS = {
 }
 
 
+MEATLESS = ("vegetarian", "vegan", "no meat", "meatless", "plant-based", "plant based")
+AVOIDING = re.compile(r"\b(?:allergic to|allergy to|no|avoid|avoids|don't eat|dont eat|can't eat|hate)\s+([a-z ]+)")
+
+
+def allowed(recipe: Template, text: str) -> bool:
+    """Whether a recipe respects what the user says about their diet, like "vegetarian" or "allergic to eggs"."""
+    lowered = text.lower()
+    if any(word in lowered for word in MEATLESS) and "vegetarian" not in recipe.tags:
+        return False
+    avoided = {word.rstrip("s") for match in AVOIDING.finditer(lowered) for word in match.group(1).split()}
+    avoided -= UNITS | {"time", "oven", "stove", "meat", "more", "than", "and", "or", "too", "much", "spicy"}
+    return not any(
+        avoid in word or avoid in ingredient.label
+        for ingredient in recipe.ingredients
+        if not ingredient.optional
+        for word in ingredient.words
+        for avoid in avoided
+        if len(avoid) > 2
+    )
+
+
 def moods_in(text: str) -> list[str]:
     lowered = text.lower()
     return [mood for mood, (words, _) in MOODS.items() if any(word in lowered for word in words)]
@@ -709,17 +730,18 @@ class Mock(LLM):
             return f"You have everything: it uses {len(uses)} things already in your kitchen."
         return f"Uses {len(uses)} things you already have."
 
-    def suggest_recipes(self, pantry: list[PantryItem], today: date, preferences: str = "") -> list[Recipe]:
+    def suggest_recipes(
+        self, pantry: list[PantryItem], today: date, preferences: str = "", notes: str = ""
+    ) -> list[Recipe]:
         if not pantry:
             return []
         wanted = set(moods_in(preferences))
         limit = time_limit(preferences)
         if limit and limit <= 20:
             wanted.add("quick")
-        avoid_meat = any(word in preferences.lower() for word in ("vegetarian", "vegan", "no meat", "meatless"))
         scored = []
         for recipe in LIBRARY:
-            if avoid_meat and "vegetarian" not in recipe.tags:
+            if not allowed(recipe, f"{preferences} {notes}"):
                 continue
             built, score = self.build(recipe, pantry, today)
             if not built.uses or len(built.missing) > 2:
@@ -731,7 +753,7 @@ class Mock(LLM):
         scored.sort(key=lambda entry: (entry[0], entry[1]))
         return [built for _, _, built in scored[:4]]
 
-    def plan_recipe(self, dish: str, pantry: list[PantryItem], today: date) -> Recipe:
+    def plan_recipe(self, dish: str, pantry: list[PantryItem], today: date, notes: str = "") -> Recipe:
         lowered = dish.lower()
         for recipe in LIBRARY:
             names = (recipe.title.lower(), *recipe.aliases)
@@ -759,7 +781,9 @@ class Mock(LLM):
             why="I don't know this one well, so check the ingredients against a trusted recipe.",
         )
 
-    def tweak_recipe(self, recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date) -> Recipe:
+    def tweak_recipe(
+        self, recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date, notes: str = ""
+    ) -> Recipe:
         revised = recipe.model_copy(deep=True)
         lowered = feedback.lower()
         changes = []
@@ -894,13 +918,16 @@ class Mock(LLM):
         pantry: list[PantryItem],
         shopping: list[ShoppingEntry],
         today: date,
+        notes: str = "",
     ) -> Iterator[str]:
-        for word in self.reply(message, pantry, shopping, today).split(" "):
+        for index, word in enumerate(self.reply(message, pantry, shopping, today, notes).split(" ")):
             if self.delay:
                 time.sleep(self.delay)
-            yield word + " "
+            yield f" {word}" if index else word
 
-    def reply(self, message: str, pantry: list[PantryItem], shopping: list[ShoppingEntry], today: date) -> str:
+    def reply(
+        self, message: str, pantry: list[PantryItem], shopping: list[ShoppingEntry], today: date, notes: str = ""
+    ) -> str:
         lowered = message.lower()
         if not pantry:
             return (
@@ -928,7 +955,7 @@ class Mock(LLM):
             sentences.append(MOODS[moods[0]][1])
         elif re.match(r"^\s*(hi|hello|hey|yo)\b", lowered):
             sentences.append("Hi! I can see what's in your kitchen.")
-        ideas = self.suggest_recipes(pantry, today, message)
+        ideas = self.suggest_recipes(pantry, today, message, notes)
         if ideas:
             top = ideas[0]
             used = join([use.name.lower() for use in top.uses[:3]])

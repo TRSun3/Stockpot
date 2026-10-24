@@ -17,6 +17,9 @@ Choices made where the brief was silent or where the project deviates from it, a
 - **Cooking may only touch the recipe's own items.** `apply_ops` takes the set of item ids the recipe used and refuses changes to anything else, in addition to refusing foreign or missing ids.
 - **Recipe uses that name unknown items become missing ingredients** rather than errors. Fixing the answer keeps a useful recipe on screen.
 - **Parsed dates outside 30 days ago to 5 years ahead become "no expiry"**, rather than dropping the item.
+- **Kitchen notes are one free-text field**, not a form of diet checkboxes. That matches the brief's free-text item model, and the LLM reads "vegetarian, allergic to peanuts, no oven, cooking for two" as easily as it reads a pantry description. The brief listed per-user preferences as a nice-to-have; they are built now because every recipe flow benefits.
+- **A recipe box of saved recipes.** Recipes are generated fresh each time, so a liked one would otherwise be lost. A saved recipe is stored whole, and checking it against today's pantry runs it through `plan` again.
+- **Chat streams as server-sent events over a POST**, read with `fetch` rather than `EventSource` (which can't POST). An `error` event can arrive partway without breaking the stream format.
 - **Beyond the brief's interface:** `plan_recipe` ("Can I make carbonara?"), `tweak_recipe` (revising a suggestion from feedback), and `adjust_pantry` with `add` ops ("I bought more eggs"). The owner asked for knowing what can be made, adjusting generated recipes, and correcting the pantry in plain words.
 
 ## Layout

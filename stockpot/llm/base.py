@@ -6,12 +6,16 @@ from datetime import date
 
 from stockpot.schemas import ChatTurn, PantryItem, PantryOp, ParsedItem, Recipe, ShoppingEntry
 
+UNAVAILABLE = "The AI cook couldn't answer just now. Nothing was changed; please try again in a moment."
+
 
 class LLMError(Exception):
     """The backend failed or answered with something unusable. The message is safe to log."""
 
 
 class LLM(ABC):
+    """`notes` is the user's standing description of their kitchen and diet, like "vegetarian, no oven"."""
+
     name: str
 
     @abstractmethod
@@ -19,15 +23,19 @@ class LLM(ABC):
         """Groceries described in plain language, each with an estimated expiry."""
 
     @abstractmethod
-    def suggest_recipes(self, pantry: list[PantryItem], today: date, preferences: str = "") -> list[Recipe]:
+    def suggest_recipes(
+        self, pantry: list[PantryItem], today: date, preferences: str = "", notes: str = ""
+    ) -> list[Recipe]:
         """Recipes built mostly from the pantry, favoring what expires soonest."""
 
     @abstractmethod
-    def plan_recipe(self, dish: str, pantry: list[PantryItem], today: date) -> Recipe:
+    def plan_recipe(self, dish: str, pantry: list[PantryItem], today: date, notes: str = "") -> Recipe:
         """A recipe for a dish the user names, showing what the pantry covers and what is missing."""
 
     @abstractmethod
-    def tweak_recipe(self, recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date) -> Recipe:
+    def tweak_recipe(
+        self, recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date, notes: str = ""
+    ) -> Recipe:
         """The recipe revised to follow the user's feedback."""
 
     @abstractmethod
@@ -46,5 +54,6 @@ class LLM(ABC):
         pantry: list[PantryItem],
         shopping: list[ShoppingEntry],
         today: date,
+        notes: str = "",
     ) -> Iterator[str]:
         """The assistant's reply to `message`, streamed in pieces."""

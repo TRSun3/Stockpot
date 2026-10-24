@@ -40,3 +40,15 @@ def test_every_pantry_prompt_carries_the_pantry_and_the_id_rule():
 def test_the_chat_prompt_includes_the_shopping_list():
     system = prompts.chat_system(PANTRY, [ShoppingEntry(name="Lemons", note="two", checked=False)], TODAY)
     assert "- [ ] Lemons (two)" in system and "[3] Milk" in system
+
+
+def test_kitchen_notes_reach_every_cooking_prompt_and_are_left_out_when_blank():
+    recipe = prompts.Recipe(title="T", summary="", time_minutes=5, uses=[], missing=[], steps=["s"], why="")
+    for system in (
+        prompts.suggest_recipes(PANTRY, TODAY, "", "allergic to peanuts")[0],
+        prompts.plan_recipe("soup", PANTRY, TODAY, "allergic to peanuts")[0],
+        prompts.tweak_recipe(recipe, "spicier", PANTRY, TODAY, "allergic to peanuts")[0],
+        prompts.chat_system(PANTRY, [], TODAY, "allergic to peanuts"),
+    ):
+        assert "standing notes" in system and "allergic to peanuts" in system
+    assert "standing notes" not in prompts.suggest_recipes(PANTRY, TODAY, "", "  ")[0]

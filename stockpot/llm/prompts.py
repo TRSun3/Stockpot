@@ -49,6 +49,15 @@ def shopping_block(shopping: list[ShoppingEntry]) -> str:
     return "\n".join(lines)
 
 
+def notes_block(notes: str) -> str:
+    if not notes.strip():
+        return ""
+    return (
+        "\nThe user's standing notes about their kitchen and diet. Always respect them, especially allergies "
+        f"and diets:\n{notes.strip()}\n"
+    )
+
+
 def recipe_json(recipe: Recipe) -> str:
     return json.dumps(recipe.model_dump(), indent=2)
 
@@ -89,9 +98,10 @@ there is no food at all."""
     return system, text
 
 
-def suggest_recipes(pantry: list[PantryItem], today: date, preferences: str) -> tuple[str, str]:
+def suggest_recipes(pantry: list[PantryItem], today: date, preferences: str, notes: str = "") -> tuple[str, str]:
     system = f"""{PERSONA}
 {pantry_block(pantry, today)}
+{notes_block(notes)}
 
 Suggest up to 4 recipes the user could cook now, built mostly from this pantry. Favor items that \
 expire soonest so nothing goes to waste, and keep `missing` to 2 or fewer ingredients for each recipe. \
@@ -101,9 +111,10 @@ Order them best first. If the pantry is empty, return an empty list.
     return system, user
 
 
-def plan_recipe(dish: str, pantry: list[PantryItem], today: date) -> tuple[str, str]:
+def plan_recipe(dish: str, pantry: list[PantryItem], today: date, notes: str = "") -> tuple[str, str]:
     system = f"""{PERSONA}
 {pantry_block(pantry, today)}
+{notes_block(notes)}
 
 The user names a dish and wants to know whether they can make it. Write a good, ordinary recipe \
 for that dish. Put every pantry item it would use in `uses`, and list honestly in `missing` every \
@@ -113,9 +124,12 @@ everything or what they would need to pick up.
     return system, f"Can I make: {dish}"
 
 
-def tweak_recipe(recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date) -> tuple[str, str]:
+def tweak_recipe(
+    recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date, notes: str = ""
+) -> tuple[str, str]:
     system = f"""{PERSONA}
 {pantry_block(pantry, today)}
+{notes_block(notes)}
 
 The user has a recipe and wants it changed. Return the whole revised recipe, following their \
 feedback closely while keeping it a recipe that works. Recompute `uses` and `missing` against the \
@@ -155,11 +169,12 @@ Return an empty list if they did not describe a change. {ID_RULE}"""
     return system, instruction
 
 
-def chat_system(pantry: list[PantryItem], shopping: list[ShoppingEntry], today: date) -> str:
+def chat_system(pantry: list[PantryItem], shopping: list[ShoppingEntry], today: date, notes: str = "") -> str:
     return f"""{PERSONA}
 {pantry_block(pantry, today)}
 
 {shopping_block(shopping)}
+{notes_block(notes)}
 
 Talk with the user about what to cook, taking their mood, cravings, energy, and time into account.
 - Build ideas around what they actually have, and lean on items that expire soon.

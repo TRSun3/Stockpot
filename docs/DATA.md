@@ -17,6 +17,8 @@ Every connection turns foreign keys on, so deleting a user deletes their session
 | `items` | The pantry: `name`, a free-text `description`, and `expires_on` (ISO date or null) |
 | `shopping_items` | The shopping list: `name`, `note`, and `checked` |
 | `chat_messages` | The chat history: `role` (`user` or `assistant`) and `content` |
+| `preferences` | One row per user holding their kitchen notes: diet, allergies, equipment, household |
+| `saved_recipes` | The recipe box: each recipe stored whole as JSON, with its title |
 
 An item is deliberately just a name, a description, and an expiry. Amounts, brands, and state ("about half a gallon of 2% milk, opened Tuesday") all live in the description, which the AI reads and rewrites. There are no quantity or unit columns.
 

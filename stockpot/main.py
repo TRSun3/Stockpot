@@ -11,12 +11,10 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from stockpot import auth, config, db, kitchen, pantry, shopping
-from stockpot.llm import LLM, LLMError, get_llm
+from stockpot import auth, chat, config, db, kitchen, pantry, preferences, recipes, shopping
+from stockpot.llm import LLM, UNAVAILABLE, LLMError, get_llm
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
-
-AI_UNAVAILABLE = "The AI cook couldn't answer just now. Nothing was changed; please try again in a moment."
 
 log = logging.getLogger("uvicorn.error")
 
@@ -53,13 +51,13 @@ def create_app(settings: config.Settings | None = None, llm: LLM | None = None) 
     @app.exception_handler(LLMError)
     async def llm_error(request: Request, error: LLMError) -> JSONResponse:
         log.warning("LLM call failed: %s", error)
-        return JSONResponse({"error": AI_UNAVAILABLE}, status_code=502)
+        return JSONResponse({"error": UNAVAILABLE}, status_code=502)
 
     @app.get("/api/health")
     def health() -> dict:
         return {"ok": True}
 
-    for module in (auth, kitchen, pantry, shopping):
+    for module in (auth, kitchen, pantry, shopping, recipes, chat, preferences):
         app.include_router(module.router)
     app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
     return app

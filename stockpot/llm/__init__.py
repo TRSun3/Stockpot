@@ -1,9 +1,9 @@
 """The LLM behind Stockpot: Google Gemini when configured with a key, a deterministic mock otherwise."""
 
 from stockpot.config import Settings
-from stockpot.llm.base import LLM, LLMError
+from stockpot.llm.base import LLM, UNAVAILABLE, LLMError
 
-__all__ = ["LLM", "LLMError", "get_llm"]
+__all__ = ["LLM", "LLMError", "UNAVAILABLE", "get_llm"]
 
 
 def get_llm(settings: Settings) -> LLM:

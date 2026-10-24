@@ -119,3 +119,36 @@ class PantryOp(BaseModel):
 
 class PantryOps(BaseModel):
     ops: list[PantryOp]
+
+
+Short = Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]
+
+
+class SuggestIn(BaseModel):
+    preferences: Short = ""
+
+
+class PlanIn(BaseModel):
+    dish: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
+class TweakIn(BaseModel):
+    recipe: Recipe
+    feedback: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+
+
+class RecipeIn(BaseModel):
+    recipe: Recipe
+
+
+class MissingIn(BaseModel):
+    names: list[Name] = Field(max_length=20)
+    recipe_title: Short = ""
+
+
+class NotesIn(BaseModel):
+    notes: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]
+
+
+class ChatIn(BaseModel):
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]

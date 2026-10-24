@@ -61,14 +61,18 @@ class Gemini(LLM):
     def parse_items(self, text: str, today: date) -> list[ParsedItem]:
         return self.structured(*prompts.parse_items(text, today), ParsedItems, temperature=0.2).items
 
-    def suggest_recipes(self, pantry: list[PantryItem], today: date, preferences: str = "") -> list[Recipe]:
-        return self.structured(*prompts.suggest_recipes(pantry, today, preferences), Recipes, 0.8).recipes
+    def suggest_recipes(
+        self, pantry: list[PantryItem], today: date, preferences: str = "", notes: str = ""
+    ) -> list[Recipe]:
+        return self.structured(*prompts.suggest_recipes(pantry, today, preferences, notes), Recipes, 0.8).recipes
 
-    def plan_recipe(self, dish: str, pantry: list[PantryItem], today: date) -> Recipe:
-        return self.structured(*prompts.plan_recipe(dish, pantry, today), Recipe)
+    def plan_recipe(self, dish: str, pantry: list[PantryItem], today: date, notes: str = "") -> Recipe:
+        return self.structured(*prompts.plan_recipe(dish, pantry, today, notes), Recipe)
 
-    def tweak_recipe(self, recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date) -> Recipe:
-        return self.structured(*prompts.tweak_recipe(recipe, feedback, pantry, today), Recipe)
+    def tweak_recipe(
+        self, recipe: Recipe, feedback: str, pantry: list[PantryItem], today: date, notes: str = ""
+    ) -> Recipe:
+        return self.structured(*prompts.tweak_recipe(recipe, feedback, pantry, today, notes), Recipe)
 
     def apply_cooking(self, recipe: Recipe, pantry: list[PantryItem], today: date) -> list[PantryOp]:
         return self.structured(*prompts.apply_cooking(recipe, pantry, today), PantryOps, 0.1).ops
@@ -83,6 +87,7 @@ class Gemini(LLM):
         pantry: list[PantryItem],
         shopping: list[ShoppingEntry],
         today: date,
+        notes: str = "",
     ) -> Iterator[str]:
         contents = [
             types.Content(role="model" if turn.role == "assistant" else "user", parts=[types.Part(text=turn.content)])
@@ -90,7 +95,7 @@ class Gemini(LLM):
         ]
         contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
         config = types.GenerateContentConfig(
-            system_instruction=prompts.chat_system(pantry, shopping, today), temperature=0.8
+            system_instruction=prompts.chat_system(pantry, shopping, today, notes), temperature=0.8
         )
         try:
             for chunk in self.client.models.generate_content_stream(model=self.model, contents=contents, config=config):

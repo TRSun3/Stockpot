@@ -65,6 +65,20 @@ def test_protected_routes_answer_401_without_a_session(client):
         ("delete", "/api/items/1"),
         ("get", "/api/shopping"),
         ("post", "/api/shopping"),
+        ("post", "/api/shopping/move-to-pantry"),
+        ("post", "/api/items/parse"),
+        ("post", "/api/items/adjust"),
+        ("post", "/api/recipes/suggest"),
+        ("post", "/api/recipes/plan"),
+        ("post", "/api/recipes/tweak"),
+        ("post", "/api/recipes/cooked"),
+        ("post", "/api/recipes/missing-to-shopping"),
+        ("get", "/api/recipes/saved"),
+        ("get", "/api/preferences"),
+        ("put", "/api/preferences"),
+        ("get", "/api/chat"),
+        ("post", "/api/chat"),
+        ("delete", "/api/chat"),
     ]:
         response = client.request(method, path)
         assert response.status_code == 401, path
