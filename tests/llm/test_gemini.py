@@ -35,6 +35,16 @@ class Models:
             yield SimpleNamespace(text=chunk)
 
 
+class Blocked:
+    """An answer withheld by a safety filter: no parsed value, and reading its text fails."""
+
+    parsed = None
+
+    @property
+    def text(self):
+        raise ValueError("no candidates")
+
+
 def gemini(**answers):
     models = Models(**answers)
     return Gemini("key", "gemini-test", client=SimpleNamespace(models=models)), models
@@ -63,6 +73,7 @@ def test_an_answer_the_sdk_did_not_parse_is_read_from_its_text():
     "answers",
     [
         {"answer": SimpleNamespace(parsed=None, text="not json")},
+        {"answer": Blocked()},
         {"error": errors.APIError(503, {"error": {"message": "overloaded", "status": "UNAVAILABLE"}})},
         {"error": TimeoutError()},
     ],

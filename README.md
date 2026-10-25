@@ -30,7 +30,7 @@ Put a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 
 ## What It Does
 
-- **Pantry:** add groceries by typing them as a sentence ("a dozen eggs, a bag of spinach and some cheddar"), or one at a time. Every item gets an estimated expiry you can edit.
+- **Pantry:** add groceries in your own words, one per line: type "a dozen eggs", press Enter, and it joins a short list to add together. Or add one item by hand. Every item gets an estimated expiry you can edit.
 - **Use Soon:** everything expiring within three days, and anything already past its date.
 - **Plain-words updates:** "I used half the milk and the spinach went bad" changes the pantry to match.
 - **Shopping list:** check things off in the store, then move them all into the pantry in one click.
@@ -48,7 +48,7 @@ uv run python -m evals.run_evals
 uv run python -m bench.run_bench
 ```
 
-`--browser` also runs the demo end to end in Microsoft Edge against a live server and saves screenshots to `screenshots/`. The evals check the AI's answers scenario by scenario, and the benchmarks time a live server. What was run before release and what it found is in [VERIFICATION.md](docs/VERIFICATION.md).
+`--browser` also runs the demo end to end in Google Chrome against a live server and saves screenshots to `screenshots/`. The evals check the AI's answers scenario by scenario, and the benchmarks time a live server. What was run before release and what it found is in [VERIFICATION.md](docs/VERIFICATION.md).
 
 ## The Components
 

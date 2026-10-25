@@ -1,6 +1,6 @@
 # API
 
-Every route is JSON under `/api`. Errors come back as `{"error": "a readable message"}` with a fitting status code, including unexpected server errors (500). Request bodies over 256 KB are refused with 413. Ids in a path must be positive whole numbers; anything else is 422. Everything except the auth routes and `/api/health` needs a logged-in session and answers 401 without one.
+Every route is JSON under `/api`. Errors come back as `{"error": "a readable message"}` with a fitting status code, including unexpected server errors (500). Request bodies over 256 KB are refused with 413, and a body sent without a Content-Length with 411. Every response says `Cache-Control: no-cache`, and responses over 1 KB are gzipped except the chat stream. Ids in a path must be positive whole numbers; anything else is 422. Everything except the auth routes and `/api/health` needs a logged-in session and answers 401 without one.
 
 ## Accounts
 
@@ -18,10 +18,10 @@ Usernames are 3 to 32 letters, digits, `_`, `.`, or `-`, unique regardless of ca
 | Method | Path | Does |
 |---|---|---|
 | GET | `/api/items` | Every item, soonest to expire first, items without an expiry last |
-| POST | `/api/items` | `{name, description?, expires_on?}` adds one item (201) |
+| POST | `/api/items` | `{name, description?, expires_on?}` adds one item, or joins it to the item of the same name already in the pantry (201) |
 | GET | `/api/items/expiring?days=3` | The Use Soon list: items expiring within `days` (0 to 60), plus everything already expired |
 | GET | `/api/items/{id}` | One item |
-| PATCH | `/api/items/{id}` | Changes only the fields sent. `"expires_on": null` clears the expiry |
+| PATCH | `/api/items/{id}` | Changes only the fields sent. `"expires_on": null` clears the expiry. 409 when a new name is another item's food |
 | DELETE | `/api/items/{id}` | Discards an item, whether used up or thrown out |
 
 An item comes back as `{id, name, description, expires_on, status, days_left, updated_at}`. `days_left` counts from today and goes negative once the item has expired. `status` is one of:
@@ -36,11 +36,13 @@ An item comes back as `{id, name, description, expires_on, status, days_left, up
 
 Names are 1 to 80 characters and descriptions up to 500. An item that belongs to another account answers 404, the same as one that doesn't exist.
 
+The pantry holds each food once. Names match ignoring case, spacing, punctuation, and plurals, so "Eggs", "egg", and "Peaches" and "peach" are the same food. Adding a food that is already there, by hand, from text, or from the shopping list, joins it to the existing item: the LLM rewrites the description to cover both ("6 left" and "a dozen" become "18 left"), and the item keeps the sooner expiry. Several of one new food in a single request become one item. If the item is edited or removed while the LLM is still merging, the edit is kept, with what was bought joined on, and a removed item comes back as just what was bought. Renaming an item to another item's food is refused with 409.
+
 ### In Plain Words
 
 | Method | Path | Does |
 |---|---|---|
-| POST | `/api/items/parse` | `{text}` like "a dozen eggs and some spinach" adds each grocery with an estimated expiry, and returns the new items (201). 422 when the text names no food |
+| POST | `/api/items/parse` | `{text}` like "a dozen eggs and some spinach" adds each grocery with an estimated expiry, and returns the items it added or joined (201). 422 when the text names no food |
 | POST | `/api/items/adjust` | `{text}` like "I used half the milk" changes the pantry to match. Returns `{changes, rejected}` |
 
 `changes` lists what happened, each as `{action: added | updated | removed, item_id, name, description?}`, so the page can say "Updated milk, removed eggs". `rejected` lists every change the LLM proposed that was refused, each with a `reason`. See [LLM.md](LLM.md) for the rules.
@@ -55,7 +57,7 @@ When the LLM fails, these routes and the other AI routes answer 502 with a frien
 | POST | `/api/shopping` | `{name, note?}` adds an entry (201) |
 | PATCH | `/api/shopping/{id}` | `{name?, note?, checked?}` changes only the fields sent |
 | DELETE | `/api/shopping/{id}` | Removes an entry |
-| POST | `/api/shopping/move-to-pantry` | Moves every checked entry into the pantry with an estimated expiry, and returns `{moved: [items]}`. 400 when nothing is checked |
+| POST | `/api/shopping/move-to-pantry` | Moves every checked entry into the pantry with an estimated expiry, and returns `{moved: [items]}`. 400 when nothing is checked, 409 when the entries were already moved or the list changed meanwhile |
 
 An entry comes back as `{id, name, note, checked}`.
 

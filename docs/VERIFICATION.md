@@ -181,3 +181,27 @@ Live uvicorn server on 127.0.0.1, 60 runs per core route. Milliseconds.
 | AI | chat: whole reply | 930.5 | 964.2 | 964.2 |
 
 Two users at once: 200 add-read-remove rounds in 5.87 s, p50 50.9 ms, p95 77.8 ms per round, 0 errors.
+
+## Optimization pass, 2026-10-24, macOS
+
+- **Gemini thinking:** one live "suggest recipes" request on `gemini-3.5-flash-lite` reported no thinking tokens (958 prompt tokens, 605 answer tokens, 1.9 s). A thinking budget has nothing to switch off, so the answer length sets the time.
+- **Recipe JSON in prompts:** compact instead of indented, 727 to 557 characters for a five-step recipe, in the tweak and "I cooked this" prompts. Evals on Gemini: `tweak-vegetarian`, `cook-omelette`, and `cook-uses-everything` pass. Evals on the mock: 23/23.
+- **Page weight:** `index.html`, `base.css`, and every module come to 81.6 KB, or 25.1 KB gzipped.
+- **Server routes:** the mock benchmark before and after stays at 1 to 3 ms per route, with the two-user run at 0.65 to 0.88 s over several runs with gzip on or off. The removed queries matter less than run-to-run noise here.
+- **Tests:** 143 passed with `--browser`, lint clean. From this pass on, the browser walkthrough runs in Google Chrome rather than Edge.
+
+## Robustness pass, 2026-10-25, macOS
+
+- **Randomized requests:** a throwaway script sent about 6,800 requests to every route over eight runs, as an anonymous and a logged-in user. It used empty, whitespace-only, emoji, non-Latin, maximum-length, SQL- and HTML-looking, and wrongly typed values, impossible dates and ids, odd recipes, and malformed or non-JSON bodies, with the test client re-raising any server exception. No exceptions and no 5xx answers.
+- **Fixed from review:** an error other than an LLM error mid-chat now ends the stream with a friendly `error` event, and a failure saving the chat no longer breaks the stream. Merging a duplicate falls back to joining the descriptions on any failure, not only an LLM error. A Gemini answer that can't be read, such as one withheld by a safety filter, becomes an `LLMError`. Reading an item back after a write answers 404 rather than failing if another request removed it. A pooled connection that can't be reset is closed rather than raising. A body sent without a Content-Length is refused with 411, because its size can't be checked. On the page, a successful answer that isn't JSON shows a readable error, and any unhandled rejection shows a toast.
+- **Tests:** 154 passed with `--browser` in Chrome, lint clean. Evals on the mock: 23/23.
+- **Benchmark, mock:** every core route stays at 1 to 4 ms. Adding an item rose by about 1 ms, to 2.3 ms with 17 items and 3.1 ms with 500, because it now checks the pantry for the same food. Two users at once: 200 rounds in 0.90 s, 0 errors.
+- **Real Gemini, seeded `neal`:** adding "a dozen eggs" joined the existing eggs as "18 large brown eggs" (1.5 s). Suggesting recipes took 2.5 s, "can I make fried rice" 1.2 s, and cooking it 0.8 s, which left "16 large brown eggs". The chat answered in 1.0 s and followed the "No scallions" note.
+
+## Second review, 2026-10-25, macOS
+
+Two independent read-only reviews, one of the backend and one of the frontend, the latter driving Chrome against its own server. Every finding below was reproduced by a test that failed before the fix.
+
+- **Backend, fixed:** the mock added the first count in a merge to every food (2 lemons became 15 alongside a dozen eggs); "the milk went bad, I bought a new gallon" refused the new milk; "Peaches"/"peach", "Cookies"/"cookie", and "Eggs."/"egg" weren't matched as one food; the mock's merge dropped what was bought when it couldn't add it up; an edit made while the LLM merged was overwritten; a shopping entry named "Ham" could take the expiry parsed for "Graham crackers". Renaming an item to another item's food is now refused with 409, the last way a duplicate could appear.
+- **Frontend, fixed:** groceries typed while "Add to pantry" ran were thrown away; a shopping edit saved after a list reload didn't show; a reload took focus out of an open edit form; Undo was 50 Tab presses away from a keyboard "Used up"; a minimized chat left an empty block below 1080px; the pantry search carried over to the next account; a toast closed even when its action failed, or while focused; the recipe box lost focus on reload; the notes dialog stayed open when a session ended; a streaming reply started a smooth scroll for every piece.
+- **Checks:** 169 passed with `--browser` in Chrome, lint clean, mock evals 23/23. A throwaway script then sent about 4,900 randomized requests over seven runs with no exceptions or 5xx answers, and none left the same food twice in the pantry. A throwaway Chrome script confirmed each frontend fix with no page errors. On real Gemini, adding "a dozen eggs, 3 peaches, a bag of rice" to "6 left" eggs and "2 ripe" peaches gave "18 left" and "5 ripe" in 2.1 s.

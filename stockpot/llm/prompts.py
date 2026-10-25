@@ -1,6 +1,5 @@
 """Every prompt Stockpot sends to Gemini. Each one carries today's date and the user's real pantry."""
 
-import json
 from datetime import date
 
 from stockpot.schemas import PantryItem, Recipe, ShoppingEntry
@@ -59,7 +58,7 @@ def notes_block(notes: str) -> str:
 
 
 def recipe_json(recipe: Recipe) -> str:
-    return json.dumps(recipe.model_dump(), indent=2)
+    return recipe.model_dump_json()
 
 
 ID_RULE = (

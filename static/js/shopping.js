@@ -8,6 +8,8 @@ import { busy, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js"
 let entries = [];
 let loaded = false;
 let seen = new Set();
+// The entry being edited and its open form, kept across re-renders so a reload never throws away typing.
+let editing = null;
 
 const fetchEntries = latestOnly(() => api("GET", "/api/shopping"));
 
@@ -32,7 +34,7 @@ export function initShopping() {
             el(
               "ul",
               {},
-              moved.map((item) => el("li", {}, el("strong", { text: item.name }), ` — ${freshnessLabel(item)}`))
+              moved.map((item) => el("li", {}, el("strong", { text: item.name }), `: ${freshnessLabel(item)}`))
             )
           )
         );
@@ -57,6 +59,7 @@ export async function loadShopping() {
     entries = fresh.map((entry) => ({ ...entry, isNew: loaded && !before.has(entry.id) }));
     seen = new Set(entries.map((entry) => entry.id));
     loaded = true;
+    if (editing && !entries.some((entry) => entry.id === editing.id)) editing = null;
     keepFocus(render);
   } catch (error) {
     toast(error.message, "error");
@@ -67,6 +70,7 @@ export function resetShopping() {
   entries = [];
   loaded = false;
   seen = new Set();
+  editing = null;
   render();
 }
 
@@ -80,23 +84,30 @@ function syncMoveButton() {
 }
 
 function render() {
-  $("#shopping-list").replaceChildren(...sorted().map(entryRow));
+  $("#shopping-list").replaceChildren(
+    ...sorted().map((entry) => (editing && editing.id === entry.id ? editing.row : entryRow(entry)))
+  );
   show($("#shopping-loading"), !loaded);
   show($("#shopping-empty"), loaded && entries.length === 0);
   syncMoveButton();
   for (const entry of entries) entry.isNew = false;
 }
 
+// Applies changes to the entry as the list holds it now, which a reload may have replaced since a request began.
+function updateEntry(id, changes) {
+  const current = entries.find((entry) => entry.id === id);
+  if (current) Object.assign(current, changes);
+}
+
 // Checking off updates the list in place, so ticking several boxes quickly never waits on or races a reload.
 async function toggle(entry, box) {
   const checked = box.checked;
-  entry.checked = checked;
+  updateEntry(entry.id, { checked });
   keepFocus(render);
   try {
-    const saved = await api("PATCH", `/api/shopping/${entry.id}`, { checked });
-    Object.assign(entry, saved);
+    updateEntry(entry.id, await api("PATCH", `/api/shopping/${entry.id}`, { checked }));
   } catch (error) {
-    entry.checked = !checked;
+    updateEntry(entry.id, { checked: !checked });
     toast(error.message, "error");
   }
   keepFocus(render);
@@ -120,17 +131,59 @@ function entryRow(entry) {
       el("span", { class: "entry-name", text: entry.name }),
       entry.note ? el("span", { class: "entry-note", text: entry.note }) : null
     ),
-    el("button", {
-      type: "button",
-      text: "Remove",
-      "aria-label": `Remove ${entry.name}`,
-      onclick: (event) =>
-        busy(event.currentTarget, async () => {
-          await api("DELETE", `/api/shopping/${entry.id}`);
-          entries = entries.filter((other) => other.id !== entry.id);
-          render();
-          $("#shopping-form [name=name]").focus();
-        }),
-    })
+    el(
+      "div",
+      { class: "item-actions" },
+      el("button", {
+        type: "button",
+        text: "Edit",
+        "aria-label": `Edit ${entry.name}`,
+        "data-key": `entry-${entry.id}-edit`,
+        onclick: () => startEditing(entry),
+      }),
+      el("button", {
+        type: "button",
+        text: "Remove",
+        "aria-label": `Remove ${entry.name}`,
+        onclick: (event) =>
+          busy(event.currentTarget, async () => {
+            await api("DELETE", `/api/shopping/${entry.id}`);
+            entries = entries.filter((other) => other.id !== entry.id);
+            render();
+            $("#shopping-form [name=name]").focus();
+          }),
+      })
+    )
   );
+}
+
+function startEditing(entry) {
+  const form = el(
+    "form",
+    { class: "grid-form edit-form", "aria-label": `Edit ${entry.name}` },
+    el("label", {}, "Item ", el("input", { name: "name", value: entry.name, required: true, maxLength: 80 })),
+    el("label", {}, "Note ", el("input", { name: "note", value: entry.note, maxLength: 500 })),
+    el(
+      "div",
+      { class: "row" },
+      el("button", { type: "submit", class: "primary", text: "Save" }),
+      el("button", { type: "button", text: "Cancel", onclick: () => stopEditing(entry) })
+    )
+  );
+  onSubmit(form, async (data) => {
+    updateEntry(entry.id, await api("PATCH", `/api/shopping/${entry.id}`, { name: data.name, note: data.note }));
+    stopEditing(entry);
+  });
+  form.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") stopEditing(entry);
+  });
+  editing = { id: entry.id, row: el("li", { class: "entry editing" }, form) };
+  render();
+  form.querySelector("input").focus();
+}
+
+function stopEditing(entry) {
+  editing = null;
+  render();
+  document.querySelector(`[data-key="entry-${entry.id}-edit"]`)?.focus();
 }

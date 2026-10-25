@@ -3,36 +3,50 @@
 
 import { el, $ } from "./dom.js";
 
-// A short message in the corner. `action` adds a button, like "Add to shopping list" after using something up.
-// The toast stays while the pointer or keyboard focus is on it.
-export function toast(message, kind = "info", action) {
+// A short message at the bottom of the page, which it returns. Each action adds a button, like "Undo" or "Add to
+// shopping list" after using something up; an action that succeeds closes the toast, and one that fails leaves it
+// to try again. The toast stays while the pointer or keyboard focus is on it.
+export function toast(message, kind = "info", ...actions) {
   const note = el(
     "div",
     { class: `toast toast-${kind}`, role: kind === "error" ? "alert" : null },
     el("span", { text: message })
   );
-  if (action) {
+  const close = () => {
+    const hadFocus = note.contains(document.activeElement);
+    note.remove();
+    if (hadFocus) $("#app-view").focus({ preventScroll: true });
+  };
+  for (const action of actions) {
     note.append(
       el("button", {
         type: "button",
         class: "link",
         text: action.label,
-        onclick: (event) => busy(event.currentTarget, action.run).then(() => note.remove()),
+        "aria-label": action.ariaLabel,
+        onclick: (event) =>
+          busy(event.currentTarget, async () => {
+            await action.run();
+            return true;
+          }).then((done) => done && close()),
       })
     );
   }
-  const lifetime = action ? 10000 : kind === "error" ? 7000 : 4000;
-  let timer = setTimeout(() => note.remove(), lifetime);
+  const lifetime = actions.length ? 10000 : kind === "error" ? 7000 : 4000;
+  let timer = setTimeout(close, lifetime);
   const hold = () => clearTimeout(timer);
   const release = () => {
+    if (note.matches(":hover") || note.contains(document.activeElement)) return;
     clearTimeout(timer);
-    timer = setTimeout(() => note.remove(), 3000);
+    timer = setTimeout(close, 3000);
   };
   note.addEventListener("mouseenter", hold);
   note.addEventListener("focusin", hold);
   note.addEventListener("mouseleave", release);
-  note.addEventListener("focusout", release);
+  // Focus moving between the toast's own buttons is not leaving it.
+  note.addEventListener("focusout", () => setTimeout(release));
   $("#toasts").append(note);
+  return note;
 }
 
 // Runs `task` with the button disabled and marked busy, so a second click can't submit twice.
@@ -82,11 +96,17 @@ export function latestOnly(load) {
   };
 }
 
-// Re-renders while keeping keyboard focus on the control with the same `data-key`, if it still exists.
+// Re-renders while keeping keyboard focus where it was: on the control with the same `data-key` if there is
+// one, or on the same element if the render only moved it, like a field in an edit form kept across reloads.
 export function keepFocus(render) {
-  const key = document.activeElement?.dataset?.key;
+  const active = document.activeElement;
+  const key = active?.dataset?.key;
   render();
-  if (key) document.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus();
+  if (key) {
+    document.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus();
+  } else if (active && active !== document.body && active.isConnected && document.activeElement !== active) {
+    active.focus({ preventScroll: true });
+  }
 }
 
 const bus = new EventTarget();
@@ -117,7 +137,7 @@ export function changeSummary(result) {
         "ul",
         {},
         result.changes.map((change) =>
-          el("li", {}, el("strong", { text: change.name }), change.description ? ` — ${change.description}` : "")
+          el("li", {}, el("strong", { text: change.name }), change.description ? `: ${change.description}` : "")
         )
       )
     );

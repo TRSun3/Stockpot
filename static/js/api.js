@@ -36,7 +36,11 @@ async function send(method, path, body) {
 export async function api(method, path, body) {
   const response = await send(method, path, body);
   if (!response.ok) throw await failure(response);
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    throw new ApiError("Stockpot sent back something unexpected. Please try again.", response.status);
+  }
 }
 
 // Posts `body` and calls `onEvent` for each server-sent event the reply streams back.

@@ -14,12 +14,112 @@ let editing = null;
 
 const fetchItems = latestOnly(() => api("GET", "/api/items"));
 
+// Groceries typed one at a time, each as {text}, waiting to be added to the pantry together in one request.
+// Each is its own object so a request clears exactly the ones it sent, even if more are typed meanwhile.
+let staged = [];
+// The API's limit on the text it parses at once.
+const MAX_TEXT = 2000;
+
+function stagedText(entries) {
+  return entries.map((entry) => entry.text).join("\n");
+}
+
+function stageEntry() {
+  const entry = $("#grocery-entry");
+  const text = entry.value.trim();
+  if (!text) return;
+  if (stagedText([...staged, { text }]).length > MAX_TEXT) {
+    toast("That's a full bag. Add these to your pantry first, then keep going.", "error");
+    return;
+  }
+  staged.push({ text });
+  entry.value = "";
+  renderStaged();
+}
+
+function unstage(index) {
+  staged.splice(index, 1);
+  renderStaged();
+  $("#grocery-entry").focus();
+}
+
+function renderStaged() {
+  $("#staged-list").replaceChildren(
+    ...staged.map(({ text }, index) =>
+      el(
+        "li",
+        { class: "staged-item" },
+        el("span", { text }),
+        el("button", {
+          type: "button",
+          class: "quiet small",
+          text: "×",
+          "aria-label": `Remove ${text}`,
+          onclick: () => unstage(index),
+        })
+      )
+    )
+  );
+  show($("#staged-list"), staged.length > 0);
+}
+
+function initStaging() {
+  $("#grocery-entry").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.isComposing) {
+      event.preventDefault();
+      stageEntry();
+    }
+  });
+  $("#stage-add").addEventListener("click", () => {
+    stageEntry();
+    $("#grocery-entry").focus();
+  });
+}
+
+const SOON_KEY = "stockpot.soon";
+
+function setSoonOpen(open) {
+  const toggle = $("#soon-toggle");
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", `${open ? "Hide" : "Show"} Use soon`);
+  toggle.querySelector("span").textContent = open ? "Hide" : "Show";
+  show($("#soon-body"), open);
+}
+
+function initSoonToggle() {
+  let open = true;
+  try {
+    open = localStorage.getItem(SOON_KEY) !== "collapsed";
+  } catch {
+    // Without storage the panel starts open.
+  }
+  setSoonOpen(open);
+  $("#soon-toggle").addEventListener("click", () => {
+    const next = $("#soon-toggle").getAttribute("aria-expanded") !== "true";
+    setSoonOpen(next);
+    try {
+      localStorage.setItem(SOON_KEY, next ? "open" : "collapsed");
+    } catch {
+      // The choice lasts until the page reloads.
+    }
+  });
+}
+
 export function initPantry() {
+  initSoonToggle();
+  initStaging();
   onSubmit(
     $("#parse-form"),
-    async ({ text }) => {
-      const added = await api("POST", "/api/items/parse", { text });
-      $("#parse-form").reset();
+    async () => {
+      stageEntry();
+      if (!staged.length) {
+        $("#grocery-entry").focus();
+        return;
+      }
+      const sent = [...staged];
+      const added = await api("POST", "/api/items/parse", { text: stagedText(sent) });
+      staged = staged.filter((entry) => !sent.includes(entry));
+      renderStaged();
       toast(`Added ${added.map((item) => item.name.toLowerCase()).join(", ")}.`);
       emit("pantry");
     },
@@ -48,7 +148,7 @@ export function initPantry() {
     "Updating…"
   );
 
-  $("#pantry-filter").addEventListener("input", () => keepFocus(render));
+  $("#pantry-filter").addEventListener("input", () => keepFocus(renderLedger));
   on("pantry", loadPantry);
 }
 
@@ -72,14 +172,27 @@ export function resetPantry() {
   loaded = false;
   seen = new Set();
   editing = null;
+  staged = [];
+  $("#pantry-filter").value = "";
+  renderStaged();
   render();
 }
 
 function render() {
+  renderSoon();
+  renderLedger();
+  for (const item of items) item.isNew = false;
+}
+
+function renderSoon() {
   const soon = items.filter((item) => item.days_left !== null && item.days_left <= 3);
   $("#soon-list").replaceChildren(...soon.map((item) => itemRow(item, "soon")));
   show($("#soon-empty"), loaded && soon.length === 0);
+  $("#soon-count").textContent = soon.length ? `(${soon.length})` : "";
+}
 
+// The pantry list, filtered by the search box; typing in the search redraws only this.
+function renderLedger() {
   const query = $("#pantry-filter").value.trim().toLowerCase();
   const shown = query
     ? items.filter((item) => `${item.name} ${item.description}`.toLowerCase().includes(query))
@@ -91,7 +204,6 @@ function render() {
   show($("#pantry-loading"), !loaded);
   show($("#pantry-empty"), loaded && items.length === 0);
   show($("#pantry-no-match"), loaded && items.length > 0 && shown.length === 0);
-  for (const item of items) item.isNew = false;
 }
 
 function itemRow(item, list) {
@@ -123,7 +235,8 @@ function itemRow(item, list) {
         text: discardLabel,
         "aria-label": `${discardLabel}: ${item.name}`,
         "data-key": `item-${item.id}-discard-${list}`,
-        onclick: (event) => discard(item, event.currentTarget),
+        // A click with no pointer behind it (detail 0) came from the keyboard.
+        onclick: (event) => discard(item, event.currentTarget, event.detail === 0),
       })
     )
   );
@@ -166,17 +279,38 @@ function stopEditing(item) {
   document.querySelector(`[data-key="item-${item.id}-edit"]`)?.focus();
 }
 
-async function discard(item, button) {
+// From the keyboard, focus moves to the toast, since the button pressed is about to disappear with its row and
+// the toast's Undo would otherwise be dozens of Tab presses away.
+async function discard(item, button, byKeyboard) {
   await busy(button, async () => {
     await api("DELETE", `/api/items/${item.id}`);
     emit("pantry");
-    toast(`Removed ${item.name.toLowerCase()}.`, "info", {
-      label: "Add to shopping list",
-      run: async () => {
-        await api("POST", "/api/shopping", { name: item.name, note: "" });
-        emit("shopping");
-        toast(`Added ${item.name.toLowerCase()} to your shopping list.`);
+    const note = toast(
+      `Removed ${item.name.toLowerCase()}.`,
+      "info",
+      {
+        label: "Add to shopping list",
+        run: async () => {
+          await api("POST", "/api/shopping", { name: item.name, note: "" });
+          emit("shopping");
+          toast(`Added ${item.name.toLowerCase()} to your shopping list.`);
+        },
       },
-    });
+      {
+        label: "Undo",
+        ariaLabel: `Undo removing ${item.name}`,
+        // Adds the item back as it was; it returns with a new id.
+        run: async () => {
+          await api("POST", "/api/items", {
+            name: item.name,
+            description: item.description,
+            expires_on: item.expires_on,
+          });
+          emit("pantry");
+          toast(`Put ${item.name.toLowerCase()} back.`);
+        },
+      }
+    );
+    if (byKeyboard) note.querySelector("button").focus();
   });
 }

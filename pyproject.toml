@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-# Playwright drives the installed Edge for the browser checks; the app never imports it.
+# Playwright drives the installed Chrome for the browser checks; the app never imports it.
 dev = [
     "httpx>=0.28.1",
     "playwright>=1.64.1",
@@ -21,7 +21,7 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = [".", "tests"]
 testpaths = ["tests"]
-markers = ["browser: drives the running app in Edge; runs only with --browser"]
+markers = ["browser: drives the running app in Chrome; runs only with --browser"]
 filterwarnings = [
     "error",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",

@@ -1,4 +1,4 @@
-"""The demo, end to end in Edge against a live server: every flow a person would click through.
+"""The demo, end to end in Chrome against a live server: every flow a person would click through.
 
 Screenshots of each step land in `screenshots/` for looking over by eye.
 """
@@ -67,7 +67,7 @@ def browser():
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="msedge")
+        browser = playwright.chromium.launch(channel="chrome")
         yield browser
         browser.close()
 
@@ -114,7 +114,7 @@ def pantry_names(page):
 def test_the_pantry_flows_from_login_to_logout(window):
     page = window
     page.goto("/")
-    page.get_by_role("heading", name="Welcome to your kitchen").wait_for()
+    page.get_by_role("heading", name="Log in to Stockpot").wait_for()
     shot(page, "01-login")
 
     log_in(page, "neal")
@@ -125,12 +125,39 @@ def test_the_pantry_flows_from_login_to_logout(window):
         expect(soon).to_contain_text(text)
     shot(page, "02-kitchen")
 
-    page.get_by_label("What did you bring home?").fill(
-        "just got back from the store: a dozen eggs, a bag of spinach, chicken thighs and some cheddar"
-    )
+    toggle = page.locator("#soon-toggle")
+    toggle.click()
+    expect(soon).to_be_hidden()
+    expect(page.locator("#soon-count")).not_to_be_empty()
+    page.reload()
+    page.locator("#pantry-list .item").first.wait_for()
+    expect(soon).to_be_hidden()
+    expect(toggle).to_have_attribute("aria-expanded", "false")
+    toggle.click()
+    expect(soon).to_be_visible()
+
+    entry = page.get_by_label("What did you bring home?")
+    for grocery in ("a dozen eggs", "a bag of spinach", "a tub of lard", "chicken thighs", "some cheddar"):
+        entry.fill(grocery)
+        entry.press("Enter")
+    staged = page.locator("#staged-list .staged-item")
+    expect(staged).to_have_count(5)
+    page.get_by_role("button", name="Remove a tub of lard").click()
+    expect(staged.locator("span")).to_have_text(["a dozen eggs", "a bag of spinach", "chicken thighs", "some cheddar"])
+    held = []
+    page.route("**/api/items/parse", lambda route: held.append(route))
     page.get_by_role("button", name="Add to pantry").click()
+    page.wait_for_function("() => document.querySelector('#parse-form [type=submit]').disabled")
+    entry.fill("a bag of rice")
+    entry.press("Enter")
+    held[0].continue_()
+    page.unroute("**/api/items/parse")
     page.locator(".toast", has_text="Added eggs, spinach, chicken thighs, cheddar").wait_for()
-    expect(page.locator("#pantry-list .item-name", has_text="Spinach")).to_have_count(2)
+    expect(page.locator("#pantry-list .item-name", has_text="Spinach")).to_have_count(1)
+    expect(page.locator("#pantry-list .item-name", has_text="Eggs")).to_have_count(1)
+    expect(staged.locator("span")).to_have_text(["a bag of rice"])
+    page.get_by_role("button", name="Remove a bag of rice").click()
+    expect(page.locator("#staged-list")).to_be_hidden()
 
     milk = page.locator("#pantry-list .item", has_text="Milk")
     milk.locator("button", has_text="Edit").click()
@@ -143,9 +170,22 @@ def test_the_pantry_flows_from_login_to_logout(window):
     page.locator("#adjust-result", has_text="Updated milk, removed avocados").wait_for()
     expect(page.locator("#pantry-list .item-name", has_text="Avocados")).to_have_count(0)
 
-    page.locator("#pantry-list .item", has_text="Sourdough").locator("button", has_text="Used up").click()
-    page.locator(".toast", has_text="Removed sourdough").get_by_role("button", name="Add to shopping list").click()
+    page.locator("#pantry-list .item", has_text="Sourdough").locator("button", has_text="Used up").press("Enter")
+    removed = page.locator(".toast", has_text="Removed sourdough")
+    expect(removed.get_by_role("button", name="Add to shopping list")).to_be_focused()
+    page.keyboard.press("Enter")
     page.locator(".toast", has_text="Added sourdough to your shopping list").wait_for()
+    expect(removed).to_have_count(0)
+
+    yogurt = page.locator("#pantry-list .item", has_text="Greek yogurt")
+    yogurt.locator("button", has_text="Toss").click()
+    expect(yogurt).to_have_count(0)
+    tossed = page.locator(".toast", has_text="Removed greek yogurt")
+    expect(tossed.locator("button")).to_have_text(["Add to shopping list", "Undo"])
+    tossed.get_by_role("button", name="Undo removing Greek yogurt").click()
+    page.locator(".toast", has_text="Put greek yogurt back").wait_for()
+    expect(yogurt).to_contain_text("Fage, big tub, opened last Sunday")
+    expect(yogurt).to_contain_text("Expired 1 day ago")
     page.get_by_label("Filter").fill("jasmine")
     expect(page.locator("#pantry-list .item-name")).to_have_text(["Rice"])
     page.get_by_label("Filter").fill("")
@@ -156,7 +196,15 @@ def test_the_pantry_flows_from_login_to_logout(window):
     page.get_by_label("Item", exact=True).fill("Basil")
     page.get_by_label("Note", exact=True).fill("a big bunch")
     page.locator("#shopping-form").get_by_role("button", name="Add").click()
-    page.locator("#shopping-list .entry", has_text="Basil").wait_for()
+    basil = page.locator("#shopping-list .entry", has_text="Basil")
+    basil.wait_for()
+    assert basil.locator(".item-actions button").all_text_contents() == ["Edit", "Remove"]
+    basil.get_by_role("button", name="Edit Basil").click()
+    editor = page.locator("#shopping-list .edit-form")
+    editor.locator("[name=note]").fill("two bunches, Thai")
+    editor.get_by_role("button", name="Save").click()
+    expect(page.locator("#shopping-list .entry", has_text="Basil")).to_contain_text("two bunches, Thai")
+    expect(page.get_by_role("button", name="Edit Basil")).to_be_focused()
     page.get_by_label("Bought Basil").check()
     page.get_by_label("Bought Lemons").check()
     page.locator("#shopping-list .entry.checked", has_text="Lemons").wait_for()
@@ -175,7 +223,7 @@ def test_the_pantry_flows_from_login_to_logout(window):
     page.locator(".toast", has_text="Saved your kitchen notes").wait_for()
 
     page.get_by_role("button", name="Log out").click()
-    page.get_by_role("heading", name="Welcome to your kitchen").wait_for()
+    page.get_by_role("heading", name="Log in to Stockpot").wait_for()
 
 
 def test_recipes_can_be_suggested_checked_tweaked_saved_and_cooked(window):
@@ -224,6 +272,12 @@ def test_recipes_can_be_suggested_checked_tweaked_saved_and_cooked(window):
     page.locator("#box-list .recipe", has_text="Spaghetti Carbonara").wait_for()
     shot(page, "07-recipe-box")
 
+    page.get_by_role("button", name="Remove Spaghetti Carbonara from the recipe box").click()
+    expect(page.locator("#box-list .recipe")).to_have_count(0)
+    page.get_by_role("button", name="Undo removing Spaghetti Carbonara").click()
+    page.locator(".toast", has_text="Put Spicy Spaghetti Carbonara back in your recipe box").wait_for()
+    expect(page.locator("#box-list .recipe h3")).to_have_text(["Spicy Spaghetti Carbonara"])
+
 
 def test_the_chat_streams_a_reply_and_leads_to_recipes(window):
     page = window
@@ -245,6 +299,25 @@ def test_the_chat_streams_a_reply_and_leads_to_recipes(window):
     page.reload()
     page.locator(".message-assistant").last.wait_for()
     assert page.locator(".message-user").last.inner_text().endswith("under 30 minutes")
+
+    workspace = page.locator(".workspace")
+    hat = page.locator("#chat-toggle")
+    narrow, spot = workspace.bounding_box()["width"], hat.bounding_box()
+    expect(hat.locator(".icon-minimize")).to_be_visible()
+    expect(hat.locator(".icon-chef")).to_be_hidden()
+    hat.click()
+    expect(hat).to_have_accessible_name("Open the chat")
+    expect(hat.locator(".icon-chef")).to_be_visible()
+    expect(hat.locator(".icon-minimize")).to_be_hidden()
+    expect(page.get_by_label("Message")).to_be_hidden()
+    assert hat.bounding_box() == spot
+    assert workspace.bounding_box()["width"] > narrow
+    shot(page, "08b-chat-minimized")
+    page.reload()
+    expect(hat).to_have_attribute("aria-expanded", "false")
+    hat.click()
+    expect(page.get_by_label("Message")).to_be_visible()
+    assert hat.bounding_box() == spot
 
 
 def test_two_windows_hold_two_separate_kitchens(window, browser, server):

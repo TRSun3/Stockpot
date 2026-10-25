@@ -1,4 +1,10 @@
-"""Changing the kitchen in plain words: typed groceries, pantry adjustments, and unpacking the shopping."""
+"""Changing the kitchen in plain words: typed groceries, pantry adjustments, and unpacking the shopping.
+Anything already in the pantry is joined to its item rather than added twice."""
+
+from datetime import timedelta
+
+import pytest
+from conftest import TODAY
 
 from stockpot.llm import BUSY, LLMBusy, LLMError
 from stockpot.llm.mock import Mock
@@ -28,6 +34,10 @@ def pantry_of(client):
     return {item["name"]: item for item in client.get("/api/items").json()}
 
 
+def day(offset):
+    return (TODAY + timedelta(days=offset)).isoformat()
+
+
 def test_groceries_typed_as_a_sentence_become_items_with_sensible_expiries(neal):
     text = "just got back from the store: a dozen eggs, a bag of spinach, chicken thighs and some cheddar"
     response = neal.post("/api/items/parse", json={"text": text})
@@ -37,6 +47,92 @@ def test_groceries_typed_as_a_sentence_become_items_with_sensible_expiries(neal)
     assert added["Eggs"]["description"] == "a dozen eggs"
     assert [added[name]["days_left"] for name in ("Chicken thighs", "Spinach", "Eggs")] == [2, 5, 21]
     assert set(pantry_of(neal)) == set(added)
+
+
+def test_groceries_already_in_the_pantry_join_that_item_with_the_sooner_expiry(neal):
+    eggs = neal.post("/api/items", json={"name": "Eggs", "description": "6 eggs", "expires_on": day(12)}).json()
+    neal.post("/api/items/parse", json={"text": "a dozen eggs, 2 tomatoes and a tomato"})
+    items = pantry_of(neal)
+    assert sorted(items) == ["Eggs", "Tomatoes"]
+    assert (items["Eggs"]["id"], items["Eggs"]["description"], items["Eggs"]["days_left"]) == (
+        eggs["id"],
+        "18 eggs",
+        12,
+    )
+    assert items["Tomatoes"]["description"] == "2 tomatoes, plus a tomato"
+
+
+def test_an_item_added_by_hand_or_moved_from_the_list_joins_one_of_the_same_name(neal):
+    neal.post("/api/items", json={"name": "Eggs", "description": "3 eggs"})
+    assert neal.post("/api/items", json={"name": "egg", "description": "2"}).json()["description"] == "5 eggs"
+    entry = neal.post("/api/shopping", json={"name": "EGGS", "note": "a dozen"}).json()
+    neal.patch(f"/api/shopping/{entry['id']}", json={"checked": True})
+    moved = neal.post("/api/shopping/move-to-pantry").json()["moved"]
+    assert [(item["name"], item["description"]) for item in moved] == [("Eggs", "17 eggs")]
+    assert list(pantry_of(neal)) == ["Eggs"]
+
+
+def test_several_foods_restocked_at_once_each_add_up_their_own_amounts(neal):
+    for name, description in [("Eggs", "6 eggs"), ("Lemons", "3 lemons"), ("Milk", "half a gallon")]:
+        neal.post("/api/items", json={"name": name, "description": description})
+    neal.post("/api/items/parse", json={"text": "a dozen eggs, 2 lemons, a gallon of milk"})
+    descriptions = {name: item["description"] for name, item in pantry_of(neal).items()}
+    assert descriptions == {"Eggs": "18 eggs", "Lemons": "5 lemons", "Milk": "half a gallon, plus a gallon of milk"}
+
+
+class Interrupted(Mock):
+    """Merges like the mock, but someone edits the item while the LLM is still working."""
+
+    def __init__(self, pool):
+        super().__init__(delay=0)
+        self.pool = pool
+
+    def adjust_pantry(self, instruction, pantry, today):
+        with self.pool.connection() as conn:
+            conn.execute("UPDATE items SET description = 'just 2 left'")
+        return super().adjust_pantry(instruction, pantry, today)
+
+
+def test_an_edit_made_while_the_llm_merges_is_kept(app, neal):
+    neal.post("/api/items", json={"name": "Eggs", "description": "6 eggs"})
+    app.state.llm = Interrupted(app.state.pool)
+    neal.post("/api/items/parse", json={"text": "a dozen eggs"})
+    assert pantry_of(neal)["Eggs"]["description"] == "just 2 left, plus a dozen eggs"
+
+
+class Reversed(Mock):
+    """Answers with the groceries in the opposite order, as an LLM may."""
+
+    def parse_items(self, text, today):
+        return super().parse_items(text, today)[::-1]
+
+
+def test_a_shopping_entry_takes_the_expiry_of_its_own_food_not_one_whose_name_contains_it(app, neal):
+    app.state.llm = Reversed(delay=0)
+    for name in ("Ham", "Graham crackers"):
+        entry = neal.post("/api/shopping", json={"name": name}).json()
+        neal.patch(f"/api/shopping/{entry['id']}", json={"checked": True})
+    moved = {item["name"]: item for item in neal.post("/api/shopping/move-to-pantry").json()["moved"]}
+    assert (moved["Ham"]["expires_on"], moved["Graham crackers"]["expires_on"]) == ("2026-10-29", "2026-10-31")
+
+
+class NoMerging(Mock):
+    def __init__(self, error):
+        super().__init__(delay=0)
+        self.error = error
+
+    def adjust_pantry(self, instruction, pantry, today):
+        raise self.error
+
+
+@pytest.mark.parametrize("error", [LLMError("timed out"), RuntimeError("a bug")])
+def test_a_merge_the_llm_cannot_write_still_keeps_both_descriptions(app, neal, error):
+    neal.post("/api/items", json={"name": "Eggs", "description": "6 left"})
+    app.state.llm = NoMerging(error)
+    assert neal.post("/api/items/parse", json={"text": "a dozen eggs"}).status_code == 201
+    assert [(item["name"], item["description"]) for item in neal.get("/api/items").json()] == [
+        ("Eggs", "6 left, plus a dozen eggs")
+    ]
 
 
 def test_text_with_no_groceries_in_it_adds_nothing_and_says_so(neal):

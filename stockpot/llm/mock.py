@@ -176,6 +176,18 @@ def countable(have: tuple[int, str], used: tuple[int, str]) -> bool:
     return unit not in MEASURES or re.sub(r"[^a-z]", "", (have[1].split() or [""])[0]) == unit
 
 
+def count_in(text: str) -> tuple[int, str] | None:
+    """The first count anywhere in a phrase: "i bought a dozen eggs" is (12, "eggs")."""
+    words = text.split()
+    for start in range(len(words)):
+        phrase = " ".join(words[start:])
+        if phrase in NUMBER_WORDS:
+            return NUMBER_WORDS[phrase], ""
+        if found := leading_count(phrase):
+            return found
+    return None
+
+
 def counted(left: int, noun: str) -> str:
     """How many are left: "9 eggs", or "1 egg" once only one remains."""
     if left == 1 and noun.endswith("s") and not noun.endswith("ss"):
@@ -946,7 +958,7 @@ class Mock(LLM):
         ops: list[PantryOp] = []
         touched: set[int] = set()
         verb = ""
-        for clause in re.split(r"\s*(?:[,;.!]|\band\b|\bbut\b|\bthen\b)\s*", instruction):
+        for clause in re.split(r"\s*(?:[,;.!\n]|\band\b|\bbut\b|\bthen\b)\s*", instruction):
             lowered = clause.lower().strip()
             if not lowered:
                 continue
@@ -990,6 +1002,14 @@ class Mock(LLM):
             case "low":
                 return update("running low")
             case "add":
+                # "- Eggs: a dozen" names what was bought after the colon; otherwise the whole clause says it.
+                bought = clause.split(":", 1)[1].strip() if ":" in clause else ""
+                have, got = leading_count(item.description), count_in(bought or clause)
+                if have and got and countable(have, got):
+                    noun = have[1] if have[1] and have[1] != "left" else item.name.lower()
+                    return PantryOp(op="update", item_id=item.id, description=counted(have[0] + got[0], noun))
+                if bought:
+                    return PantryOp(op="update", item_id=item.id, description=f"{item.description}, plus {bought}")
                 return update("restocked", expires_on=expiry(item.name, today))
             case "more":
                 return update("plenty left")

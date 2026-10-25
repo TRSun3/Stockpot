@@ -6,7 +6,7 @@
 - `uv run uvicorn stockpot.main:app --reload` serves the app at http://localhost:8000.
 - `uv run python -m stockpot.seed` creates or resets the demo accounts `neal` and `tianyue` (password `stockpot`).
 - `uv run pytest` runs the tests. Warnings are errors.
-- `uv run pytest --browser` also drives the whole demo in Edge against a live server and saves screenshots to `screenshots/`. Run it after any frontend change.
+- `uv run pytest --browser` also drives the whole demo in Google Chrome against a live server and saves screenshots to `screenshots/`. Run it after any frontend change.
 - `uv run ruff check .` and `uv run ruff format .` lint and format. Both must be clean before a commit.
 - `uv run python -m evals.run_evals` checks the AI's answers; run it after changing a prompt or the mock.
 - `uv run python -m bench.run_bench` times a live server; `--record` appends the results to `docs/VERIFICATION.md`.

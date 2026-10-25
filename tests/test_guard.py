@@ -125,7 +125,7 @@ def test_ops_can_be_limited_to_the_items_a_recipe_used(conn, kitchen):
     assert set(names(conn, neal)) == {"Milk", "Rice"}
 
 
-def test_an_add_needs_permission_and_a_name_and_keeps_only_a_believable_expiry(conn, kitchen):
+def test_an_add_needs_permission_a_name_and_a_new_food_and_keeps_only_a_believable_expiry(conn, kitchen):
     neal, _, _, _ = kitchen
     result = guard.apply_ops(
         conn,
@@ -134,13 +134,30 @@ def test_an_add_needs_permission_and_a_name_and_keeps_only_a_believable_expiry(c
             PantryOp(op="add", name="bread", description="a sourdough loaf", expires_on="2026-10-29"),
             PantryOp(op="add", name="  ", description="nameless"),
             PantryOp(op="add", name="Jam", expires_on="1999-01-01"),
+            PantryOp(op="add", name="egg", description="a dozen"),
+            PantryOp(op="add", name="Breads", description="another loaf"),
         ],
         TODAY,
         allow_add=True,
     )
-    assert [r["reason"] for r in result["rejected"]] == ["an added item needs a name"]
+    duplicate = "that's already in the pantry, so it should be updated instead"
+    assert [r["reason"] for r in result["rejected"]] == ["an added item needs a name", duplicate, duplicate]
     added = {row["name"]: row["expires_on"] for row in pantry.rows(conn, neal)}
     assert (added["Bread"], added["Jam"]) == ("2026-10-29", None)
+    assert names(conn, neal)["Eggs"] == "some eggs"
+
+
+def test_a_food_thrown_out_can_be_added_back_fresh_in_the_same_batch(conn, kitchen):
+    neal, _, mine, _ = kitchen
+    result = guard.apply_ops(
+        conn,
+        neal,
+        [PantryOp(op="delete", item_id=mine["Milk"]), PantryOp(op="add", name="Milk", description="a new gallon")],
+        TODAY,
+        allow_add=True,
+    )
+    assert result["rejected"] == []
+    assert names(conn, neal)["Milk"] == "a new gallon"
 
 
 def test_a_failure_partway_through_leaves_the_pantry_exactly_as_it_was(conn, kitchen, monkeypatch):

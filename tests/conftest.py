@@ -13,7 +13,7 @@ TODAY = date(2026, 10, 24)
 
 
 def pytest_addoption(parser):
-    parser.addoption("--browser", action="store_true", help="also drive the running app in Edge")
+    parser.addoption("--browser", action="store_true", help="also drive the running app in Chrome")
 
 
 def pytest_collection_modifyitems(config, items):

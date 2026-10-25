@@ -159,11 +159,9 @@ h3 {
 
 h4 {
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink-soft);
   margin-bottom: var(--space-2);
 }
 
@@ -216,15 +214,6 @@ svg {
   top: var(--space-3);
 }
 
-.eyebrow {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: var(--space-1);
-}
-
 .muted {
   color: var(--muted);
 }
@@ -240,9 +229,7 @@ svg {
 }
 
 .empty {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--muted);
   padding: var(--space-4) 0;
 }
@@ -457,14 +444,6 @@ input[type="date"] {
   font-variation-settings: "opsz" 144;
 }
 
-.brand-tagline {
-  font-family: var(--font-display);
-  font-style: italic;
-  color: var(--muted);
-  padding-left: var(--space-3);
-  border-left: 1px solid var(--rule-strong);
-}
-
 .account {
   display: flex;
   align-items: center;
@@ -500,10 +479,8 @@ input[type="date"] {
   border-radius: 999px;
   border: 1px solid var(--rule-strong);
   color: var(--ink-soft);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -539,54 +516,9 @@ input[type="date"] {
 /* Login */
 
 .auth {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 26rem);
-  gap: var(--space-7);
-  align-items: center;
-  max-width: 68rem;
+  max-width: 26rem;
   margin: 0 auto;
-  padding: var(--space-7) var(--space-6);
-  min-height: calc(100vh - 6rem);
-}
-
-.auth-headline {
-  font-family: var(--font-display);
-  font-size: clamp(2.6rem, 5vw, 4.2rem);
-  font-weight: 500;
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-  font-variation-settings: "opsz" 144;
-  margin: var(--space-3) 0 var(--space-5);
-}
-
-.auth-lede {
-  font-size: 1.1rem;
-  color: var(--ink-soft);
-  max-width: 32rem;
-}
-
-.auth-points {
-  list-style: none;
-  margin-top: var(--space-6);
-  display: grid;
-  gap: var(--space-3);
-}
-
-.auth-points li {
-  display: flex;
-  gap: var(--space-3);
-  align-items: baseline;
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-}
-
-.auth-points li::before {
-  content: "";
-  flex: none;
-  width: 1.4rem;
-  height: 1px;
-  background: var(--accent);
-  transform: translateY(-0.3rem);
+  padding: var(--space-7) var(--space-4);
 }
 
 .auth-card {
@@ -598,7 +530,7 @@ input[type="date"] {
 }
 
 .auth-card h1 {
-  font-size: 1.9rem;
+  font-size: 1.7rem;
   margin-bottom: var(--space-2);
 }
 
@@ -756,6 +688,63 @@ input[type="date"] {
   color: var(--accent);
 }
 
+.entry-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.entry-row .field {
+  min-width: 0;
+}
+
+.staged {
+  list-style: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: var(--space-1) var(--space-3);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.staged-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0.3rem 0;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.staged-item + .staged-item {
+  border-top: 1px dashed var(--rule);
+}
+
+.staged-item button {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+}
+
+.collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.collapse-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 160ms var(--ease);
+}
+
+.collapse-toggle[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
 /* Freshness: a dot and a quiet label, colored by how soon the item turns. */
 
 .freshness {
@@ -883,6 +872,11 @@ input[type="date"] {
   transition: opacity 160ms var(--ease);
 }
 
+/* "Toss" and "Used up" share one width, so the Edit buttons line up down the ledger. */
+.ledger .item-actions button:last-child {
+  min-width: 5.5rem;
+}
+
 .ledger .item:hover .item-actions,
 .ledger .item:focus-within .item-actions {
   opacity: 1;
@@ -938,6 +932,15 @@ input[type="date"] {
   gap: var(--space-3);
   padding: 0.7rem var(--space-1);
   border-bottom: 1px solid var(--rule);
+}
+
+.entry .item-actions {
+  flex: none;
+}
+
+.entry.editing {
+  display: block;
+  padding: var(--space-4) var(--space-1);
 }
 
 .entry-main {
@@ -1068,10 +1071,7 @@ input[type="date"] {
 .recipe-meta {
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 0.85rem;
   color: var(--muted);
 }
 
@@ -1092,12 +1092,9 @@ input[type="date"] {
 }
 
 .recipe-why {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.02rem;
-  color: var(--accent);
-  padding-left: var(--space-3);
-  border-left: 2px solid var(--accent);
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--ink-soft);
 }
 
 .recipe-ingredients {
@@ -1222,6 +1219,78 @@ input[type="date"] {
   border-bottom: 1px solid var(--rule);
 }
 
+/* The chef hat sits at the right end of the Send row and stays on that spot when the chat is minimized:
+   the panel keeps its height and padding, everything but the hat folds away, and the column narrows to
+   the hat so the kitchen widens. */
+.chef-button {
+  margin-left: auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chef-button:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.chef-button svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+/* Open, it is a quiet minimize button; minimized, the filled chef hat that brings the chat back. */
+.chef-button[aria-expanded="true"] {
+  border-color: var(--rule-strong);
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.chef-button[aria-expanded="true"]:hover {
+  border-color: var(--ink-soft);
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.chef-button[aria-expanded="true"] svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.chef-button[aria-expanded="true"] .icon-chef,
+.chef-button[aria-expanded="false"] .icon-minimize {
+  display: none;
+}
+
+.app.chat-minimized {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.chat-minimized .chat {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.chat-minimized .chat-head,
+.chat-minimized .messages,
+.chat-minimized .chat-empty,
+.chat-minimized .chat-form textarea,
+.chat-minimized .chat-form .row > :not(.chef-button) {
+  display: none;
+}
+
+.chat-minimized .chat-form {
+  margin-top: auto;
+  border-top-color: transparent;
+  background: transparent;
+}
+
 .messages {
   list-style: none;
   flex: 1 1 auto;
@@ -1247,9 +1316,7 @@ input[type="date"] {
 }
 
 .chat-empty p:first-child {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  line-height: 1.35;
+  color: var(--ink-soft);
 }
 
 .chat-empty .muted {
@@ -1324,8 +1391,9 @@ input[type="date"] {
 
 .toast {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding: 0.75rem 1.1rem;
   border-radius: var(--radius);
   background: var(--ink);
@@ -1333,6 +1401,10 @@ input[type="date"] {
   box-shadow: var(--shadow-float);
   font-size: 0.9rem;
   animation: rise 260ms var(--ease);
+}
+
+.toast > span {
+  flex: 1 1 auto;
 }
 
 .toast .link {
@@ -1387,19 +1459,7 @@ dialog h2 {
 .recipe,
 .message.is-new,
 .changes {
-  animation: rise 320ms var(--ease) both;
-}
-
-.recipes .recipe:nth-child(2) {
-  animation-delay: 60ms;
-}
-
-.recipes .recipe:nth-child(3) {
-  animation-delay: 120ms;
-}
-
-.recipes .recipe:nth-child(4) {
-  animation-delay: 180ms;
+  animation: rise 180ms var(--ease) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1415,7 +1475,8 @@ dialog h2 {
 /* Narrower windows */
 
 @media (max-width: 1080px) {
-  .app {
+  .app,
+  .app.chat-minimized {
     grid-template-columns: 1fr;
   }
 
@@ -1423,16 +1484,18 @@ dialog h2 {
     position: static;
     height: 34rem;
   }
+
+  /* Under the tabs, a minimized chat is just the hat's row, without the empty panel above it. */
+  .chat-minimized .chat {
+    height: auto;
+    min-height: 0;
+  }
 }
 
 @media (max-width: 760px) {
   .masthead {
     flex-wrap: wrap;
     padding: var(--space-4);
-  }
-
-  .brand-tagline {
-    display: none;
   }
 
   .account {
@@ -1446,8 +1509,6 @@ dialog h2 {
   }
 
   .auth {
-    grid-template-columns: 1fr;
-    gap: var(--space-5);
     padding: var(--space-5) var(--space-4);
   }
 

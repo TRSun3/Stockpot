@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from stockpot.auth import Conn, CurrentUser
 from stockpot.deps import RowId, Today
-from stockpot.schemas import ItemIn, ItemPatch, PantryItem
+from stockpot.schemas import ItemPatch, PantryItem
 
 SOON_DAYS = 3
 
@@ -41,6 +41,30 @@ def to_json(row: sqlite3.Row, today: date) -> dict:
     }
 
 
+def singular(word: str) -> str:
+    """A word's singular stem, the same for both forms: "peaches" and "peach", "cookies" and "cookie"."""
+    if word.endswith("ies") and len(word) > 4:
+        return word[:-3] + "i"
+    if word.endswith(("ches", "shes", "sses", "xes", "zes", "oes")):
+        return word[:-2]
+    if word.endswith("s") and not word.endswith("ss"):
+        word = word[:-1]
+    if word.endswith("ie") and len(word) > 3:
+        return word[:-1]
+    if word.endswith("y") and len(word) > 2 and word[-2] not in "aeiou":
+        return word[:-1] + "i"
+    return word
+
+
+def food_key(name: str) -> str:
+    """The name reduced so the same food matches however it is written: "Eggs", "egg", and " EGGS " all match."""
+    words = [word.strip(".,;:!?'\"()") for word in name.lower().split()]
+    words = [word for word in words if word]
+    if not words:
+        return ""
+    return " ".join([*words[:-1], singular(words[-1])])
+
+
 COLUMNS = "id, name, description, expires_on, updated_at"
 ORDER = "ORDER BY expires_on IS NULL, expires_on, name COLLATE NOCASE, id"
 
@@ -50,11 +74,15 @@ def rows(conn: sqlite3.Connection, user_id: int) -> list[sqlite3.Row]:
     return conn.execute(f"SELECT {COLUMNS} FROM items WHERE user_id = ? {ORDER}", (user_id,)).fetchall()
 
 
-def for_llm(conn: sqlite3.Connection, user_id: int) -> list[PantryItem]:
+def as_llm(items: list[sqlite3.Row]) -> list[PantryItem]:
     return [
         PantryItem(id=item["id"], name=item["name"], description=item["description"], expires_on=item["expires_on"])
-        for item in rows(conn, user_id)
+        for item in items
     ]
+
+
+def for_llm(conn: sqlite3.Connection, user_id: int) -> list[PantryItem]:
+    return as_llm(rows(conn, user_id))
 
 
 def row(conn: sqlite3.Connection, user_id: int, item_id: int) -> sqlite3.Row | None:
@@ -100,12 +128,6 @@ def list_items(user: CurrentUser, conn: Conn, today: Today) -> list[dict]:
     return [to_json(item, today) for item in rows(conn, user.id)]
 
 
-@router.post("", status_code=201)
-def add_item(body: ItemIn, user: CurrentUser, conn: Conn, today: Today) -> dict:
-    item_id = insert(conn, user.id, body.name, body.description, body.expires_on)
-    return to_json(row(conn, user.id, item_id), today)
-
-
 @router.get("/expiring")
 def expiring(
     user: CurrentUser, conn: Conn, today: Today, days: Annotated[int, Query(ge=0, le=60)] = SOON_DAYS
@@ -122,9 +144,16 @@ def get_item(item_id: RowId, user: CurrentUser, conn: Conn, today: Today) -> dic
 
 @router.patch("/{item_id}")
 def edit_item(item_id: RowId, body: ItemPatch, user: CurrentUser, conn: Conn, today: Today) -> dict:
-    found(conn, user.id, item_id)
-    update(conn, user.id, item_id, body.changes())
-    return to_json(row(conn, user.id, item_id), today)
+    """Changes only the fields sent. A new name may not be the name of another item: each food is kept once."""
+    changes = body.changes()
+    if "name" in changes:
+        key = food_key(changes["name"])
+        for other in rows(conn, user.id):
+            if other["id"] != item_id and food_key(other["name"]) == key:
+                raise HTTPException(409, f"{other['name']} is already in your pantry. Edit that one instead.")
+    if not update(conn, user.id, item_id, changes):
+        raise HTTPException(404, "That item isn't in your pantry.")
+    return to_json(found(conn, user.id, item_id), today)
 
 
 @router.delete("/{item_id}")

@@ -1,6 +1,7 @@
 """The mood chat: the user talks about what they feel like, and the reply streams back built on their kitchen."""
 
 import json
+import logging
 import sqlite3
 from collections.abc import Iterator
 
@@ -10,12 +11,14 @@ from fastapi.responses import StreamingResponse
 from stockpot import db, pantry, preferences, shopping
 from stockpot.auth import Conn, CurrentUser
 from stockpot.deps import Model, Today
-from stockpot.llm import LLMError
+from stockpot.llm import UNAVAILABLE, LLMError
 from stockpot.schemas import ChatIn, ChatTurn, ShoppingEntry
 
 HISTORY = 20
 
 router = APIRouter(prefix="/api/chat")
+
+log = logging.getLogger("uvicorn.error")
 
 
 def messages(conn: sqlite3.Connection, user_id: int, limit: int = 200) -> list[sqlite3.Row]:
@@ -61,14 +64,20 @@ def send(body: ChatIn, request: Request, user: CurrentUser, conn: Conn, today: T
                     yield event({"type": "text", "text": piece})
             except LLMError as error:
                 yield event({"type": "error", "error": error.friendly})
+            except Exception:
+                log.exception("Chat reply failed")
+                yield event({"type": "error", "error": UNAVAILABLE})
         finally:
             reply = "".join(pieces).strip()
             if reply:
-                with pool.connection() as writer, db.transaction(writer):
-                    writer.executemany(
-                        "INSERT INTO chat_messages (user_id, role, content) VALUES (?, ?, ?)",
-                        [(user.id, "user", body.message), (user.id, "assistant", reply)],
-                    )
+                try:
+                    with pool.connection() as writer, db.transaction(writer):
+                        writer.executemany(
+                            "INSERT INTO chat_messages (user_id, role, content) VALUES (?, ?, ?)",
+                            [(user.id, "user", body.message), (user.id, "assistant", reply)],
+                        )
+                except sqlite3.Error:
+                    log.exception("Saving the chat failed")
         yield event({"type": "done"})
 
     return StreamingResponse(

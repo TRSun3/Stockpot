@@ -7,9 +7,38 @@ import { busy, onSubmit, toast } from "./ui.js";
 let lastAsked = "";
 let streaming = false;
 
+const OPEN_KEY = "stockpot.chat";
+
+// Shows the whole chat, or folds it away leaving only the chef-hat button, which stays where it was.
+function setChatOpen(open) {
+  const toggle = $("#chat-toggle");
+  const label = open ? "Minimize the chat" : "Open the chat";
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", label);
+  toggle.title = label;
+  $("#app-view").classList.toggle("chat-minimized", !open);
+  if (open) scrollToEnd();
+  try {
+    localStorage.setItem(OPEN_KEY, open ? "open" : "minimized");
+  } catch {
+    // The choice lasts until the page reloads.
+  }
+}
+
 export function initChat({ onRecipes }) {
   const form = $("#chat-form");
   const input = $("#chat-input");
+
+  let open = true;
+  try {
+    open = localStorage.getItem(OPEN_KEY) !== "minimized";
+  } catch {
+    // Without storage the chat starts open.
+  }
+  setChatOpen(open);
+  $("#chat-toggle").addEventListener("click", () =>
+    setChatOpen($("#chat-toggle").getAttribute("aria-expanded") !== "true")
+  );
 
   onSubmit(form, ({ message }) => send(message.trim()), "Sending…");
 
@@ -66,7 +95,8 @@ function bubble(role, text) {
 
 function scrollToEnd() {
   const list = $("#chat-messages");
-  list.scrollTop = list.scrollHeight;
+  // Instant, so a streaming reply doesn't start a new smooth scroll for every piece.
+  list.scrollTo({ top: list.scrollHeight, behavior: "instant" });
 }
 
 function setStreaming(active) {

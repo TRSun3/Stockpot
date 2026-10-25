@@ -64,12 +64,15 @@ class Gemini(LLM):
         except Exception as error:
             log.warning("Gemini request failed: %s", type(error).__name__)
             raise LLMError("Gemini could not be reached.") from error
-        if isinstance(response.parsed, schema):
-            return response.parsed
         try:
+            if isinstance(response.parsed, schema):
+                return response.parsed
             return schema.model_validate_json(response.text or "")
         except ValidationError as error:
             raise LLMError("Gemini answered in an unexpected shape.") from error
+        except Exception as error:
+            log.warning("Reading the Gemini answer failed: %s", type(error).__name__)
+            raise LLMError("Gemini answered with something unreadable.") from error
 
     def parse_items(self, text: str, today: date) -> list[ParsedItem]:
         return self.structured(*prompts.parse_items(text, today), ParsedItems, temperature=0.2).items

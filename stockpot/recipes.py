@@ -20,6 +20,7 @@ def owned(conn: sqlite3.Connection, user_id: int) -> dict[int, sqlite3.Row]:
 
 
 def usable(recipe: Recipe | None, conn: sqlite3.Connection, user_id: int) -> dict:
+    """The answer checked against the pantry as it is now, which may have changed while the LLM worked."""
     cleaned = recipe and guard.clean_recipe(recipe, owned(conn, user_id))
     if cleaned is None:
         raise HTTPException(502, "The AI cook came back without a usable recipe. Please try again.")
@@ -47,11 +48,12 @@ def plan(body: PlanIn, user: CurrentUser, conn: Conn, today: Today, llm: Model) 
 @router.post("/tweak")
 def tweak(body: TweakIn, user: CurrentUser, conn: Conn, today: Today, llm: Model) -> dict:
     """The recipe revised to follow the user's feedback, like "make it spicier" or "no oven"."""
-    given = guard.clean_recipe(body.recipe, owned(conn, user.id))
+    items = owned(conn, user.id)
+    given = guard.clean_recipe(body.recipe, items)
     if given is None:
         raise HTTPException(422, "A recipe needs a title and at least one step.")
     recipe = llm.tweak_recipe(
-        given, body.feedback, pantry.for_llm(conn, user.id), today, preferences.notes(conn, user.id)
+        given, body.feedback, pantry.as_llm(list(items.values())), today, preferences.notes(conn, user.id)
     )
     return {"recipe": usable(recipe, conn, user.id)}
 
@@ -59,10 +61,11 @@ def tweak(body: TweakIn, user: CurrentUser, conn: Conn, today: Today, llm: Model
 @router.post("/cooked")
 def cooked(body: RecipeIn, user: CurrentUser, conn: Conn, today: Today, llm: Model) -> dict:
     """Updates the pantry after cooking: only the items the recipe used, and only ones the user owns."""
-    recipe = guard.clean_recipe(body.recipe, owned(conn, user.id))
+    items = owned(conn, user.id)
+    recipe = guard.clean_recipe(body.recipe, items)
     if recipe is None or not recipe.uses:
         raise HTTPException(404, "None of this recipe's ingredients are in your pantry.")
-    ops = llm.apply_cooking(recipe, pantry.for_llm(conn, user.id), today)
+    ops = llm.apply_cooking(recipe, pantry.as_llm(list(items.values())), today)
     return guard.apply_ops(conn, user.id, ops, today, allowed={use.item_id for use in recipe.uses})
 
 
@@ -77,7 +80,8 @@ def missing_to_shopping(body: MissingIn, user: CurrentUser, conn: Conn) -> dict:
             skipped.append(name)
             continue
         waiting.add(name.lower())
-        added.append(shopping.to_json(shopping.row(conn, user.id, shopping.insert(conn, user.id, name, note))))
+        if entry := shopping.row(conn, user.id, shopping.insert(conn, user.id, name, note)):
+            added.append(shopping.to_json(entry))
     return {"added": added, "skipped": skipped}
 
 

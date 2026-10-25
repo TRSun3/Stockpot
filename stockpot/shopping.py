@@ -49,12 +49,11 @@ def list_entries(user: CurrentUser, conn: Conn) -> list[dict]:
 
 @router.post("", status_code=201)
 def add_entry(body: ShoppingIn, user: CurrentUser, conn: Conn) -> dict:
-    return to_json(row(conn, user.id, insert(conn, user.id, body.name, body.note)))
+    return to_json(found(conn, user.id, insert(conn, user.id, body.name, body.note)))
 
 
 @router.patch("/{entry_id}")
 def edit_entry(entry_id: RowId, body: ShoppingPatch, user: CurrentUser, conn: Conn) -> dict:
-    found(conn, user.id, entry_id)
     changes = body.changes()
     if changes:
         assignments = ", ".join(f"{column} = ?" for column in changes)
@@ -62,7 +61,7 @@ def edit_entry(entry_id: RowId, body: ShoppingPatch, user: CurrentUser, conn: Co
             f"UPDATE shopping_items SET {assignments} WHERE id = ? AND user_id = ?",
             (*changes.values(), entry_id, user.id),
         )
-    return to_json(row(conn, user.id, entry_id))
+    return to_json(found(conn, user.id, entry_id))
 
 
 @router.delete("/{entry_id}")

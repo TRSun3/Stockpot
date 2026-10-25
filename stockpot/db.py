@@ -123,8 +123,13 @@ class Pool:
         return connect(self.path)
 
     def give(self, conn: sqlite3.Connection) -> None:
-        if conn.in_transaction:
-            conn.execute("ROLLBACK")
+        """Returns a connection for reuse, or closes it when it can't be cleanly reset."""
+        try:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            conn.close()
+            return
         with self.lock:
             if len(self.idle) < self.size:
                 self.idle.append(conn)

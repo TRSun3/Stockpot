@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from stockpot.llm import LLMError
 from stockpot.llm.mock import Mock
 
@@ -9,13 +11,14 @@ from stockpot.llm.mock import Mock
 class Stalling(Mock):
     """Says a little, then fails."""
 
-    def __init__(self, before=()):
+    def __init__(self, before=(), error=None):
         super().__init__(delay=0)
         self.before = before
+        self.error = error or LLMError("timed out")
 
     def chat(self, history, message, pantry, shopping, today, notes=""):
         yield from self.before
-        raise LLMError("timed out")
+        raise self.error
 
 
 class Recording(Mock):
@@ -72,10 +75,12 @@ def test_a_failed_reply_streams_an_error_and_leaves_no_half_conversation(app, ne
     assert neal.get("/api/chat").json() == []
 
 
-def test_a_reply_cut_off_partway_keeps_what_was_said(app, neal):
-    app.state.llm = Stalling(before=["Try ", "an omelette"])
+@pytest.mark.parametrize("error", [LLMError("timed out"), RuntimeError("a bug")])
+def test_a_reply_cut_off_partway_by_any_failure_keeps_what_was_said_and_ends_cleanly(app, neal, error):
+    app.state.llm = Stalling(before=["Try ", "an omelette"], error=error)
     stream = events(neal.post("/api/chat", json={"message": "ideas?"}))
     assert [event["type"] for event in stream] == ["text", "text", "error", "done"]
+    assert "try again" in stream[2]["error"]
     assert [m["content"] for m in neal.get("/api/chat").json()] == ["ideas?", "Try an omelette"]
 
 

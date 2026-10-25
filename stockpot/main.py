@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
@@ -64,11 +65,24 @@ def create_app(settings: config.Settings | None = None, llm: LLM | None = None) 
 
     @app.middleware("http")
     async def limit_body(request: Request, call_next) -> Response:
-        """Refuses request bodies over 256 KB before reading them; nothing Stockpot accepts comes close."""
+        """Refuses request bodies over 256 KB before reading them; nothing Stockpot accepts comes close. A body
+        sent without a length can't be checked up front, so it is refused too."""
+        if "transfer-encoding" in request.headers and "content-length" not in request.headers:
+            return JSONResponse({"error": "Requests need a Content-Length."}, status_code=411)
         length = request.headers.get("content-length", "0")
         if not length.isdigit() or int(length) > MAX_BODY:
             return JSONResponse({"error": "That request is too large."}, status_code=413)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def revalidate(request: Request, call_next) -> Response:
+        """Makes the browser check every file for changes before using its cached copy, so an edited
+        script or stylesheet is never paired with a stale one; unchanged files come back as a short 304."""
+        response = await call_next(request)
+        response.headers.setdefault("Cache-Control", "no-cache")
+        return response
+
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     @app.get("/api/health")
     def health() -> dict:

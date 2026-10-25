@@ -3,10 +3,13 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { minutes } from "./format.js";
-import { busy, changeSummary, emit, latestOnly, on, onSubmit, toast } from "./ui.js";
+import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js";
 
 const PREFERENCES_LIMIT = 300;
 const fetchBox = latestOnly(() => api("GET", "/api/recipes/saved"));
+// Each saved recipe as stored, by its saved id, so undoing a removal restores it even after "Check my kitchen"
+// has shown a re-planned version on its card.
+let savedRecipes = new Map();
 
 export function initRecipes() {
   onSubmit(
@@ -58,7 +61,10 @@ export async function loadBox() {
   try {
     const saved = await fetchBox();
     if (saved === undefined) return;
-    $("#box-list").replaceChildren(...saved.map((entry) => recipeCard(entry.recipe, { savedId: entry.id })));
+    savedRecipes = new Map(saved.map((entry) => [entry.id, entry.recipe]));
+    keepFocus(() =>
+      $("#box-list").replaceChildren(...saved.map((entry) => recipeCard(entry.recipe, { savedId: entry.id })))
+    );
     show($("#box-empty"), saved.length === 0);
   } catch (error) {
     toast(error.message, "error");
@@ -66,6 +72,7 @@ export async function loadBox() {
 }
 
 export function resetRecipes() {
+  savedRecipes = new Map();
   for (const id of ["#recipe-list", "#plan-list", "#box-list"]) $(id).replaceChildren();
   show($("#recipes-empty"), true);
 }
@@ -106,7 +113,7 @@ function recipeCard(recipe, { savedId } = {}) {
               "ul",
               {},
               recipe.uses.map((use) =>
-                el("li", {}, el("strong", { text: use.name }), use.amount ? ` — ${use.amount}` : "")
+                el("li", {}, el("strong", { text: use.name }), use.amount ? `: ${use.amount}` : "")
               )
             )
           : el("p", { class: "muted", text: "Nothing yet." })
@@ -121,7 +128,7 @@ function recipeCard(recipe, { savedId } = {}) {
               {},
               recipe.missing.map((name) => el("li", { text: name }))
             )
-          : el("p", { class: "muted", text: "Nothing — you have it all." })
+          : el("p", { class: "muted", text: "Nothing. You have it all." })
       )
     ),
     el(
@@ -180,7 +187,7 @@ function actions(recipe, savedId, card, result) {
               toast(
                 names.length
                   ? `Added ${names.join(", ")} to your shopping list.`
-                  : `${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} already on your list.`
+                  : `Already on your list: ${skipped.join(", ").toLowerCase()}.`
               );
               emit("shopping");
             },
@@ -215,12 +222,13 @@ function actions(recipe, savedId, card, result) {
         type: "button",
         text: "Check my kitchen",
         "aria-label": `Check my kitchen for ${recipe.title}`,
+        "data-key": `box-${savedId}-check`,
         onclick: (event) =>
           busy(
             event.currentTarget,
             async () => {
               const { recipe: fresh } = await api("POST", "/api/recipes/plan", { dish: recipe.title.slice(0, 120) });
-              card().replaceWith(recipeCard(fresh, { savedId }));
+              keepFocus(() => card().replaceWith(recipeCard(fresh, { savedId })));
             },
             "Checking…"
           ),
@@ -229,11 +237,27 @@ function actions(recipe, savedId, card, result) {
         type: "button",
         text: "Remove from box",
         "aria-label": `Remove ${recipe.title} from the recipe box`,
-        onclick: (event) =>
+        "data-key": `box-${savedId}-remove`,
+        onclick: (event) => {
+          // A click with no pointer behind it (detail 0) came from the keyboard: focus follows to the toast.
+          const byKeyboard = event.detail === 0;
           busy(event.currentTarget, async () => {
+            const stored = savedRecipes.get(savedId) || recipe;
             await api("DELETE", `/api/recipes/saved/${savedId}`);
             emit("box");
-          }),
+            const note = toast(`Removed ${recipe.title} from your recipe box.`, "info", {
+              label: "Undo",
+              ariaLabel: `Undo removing ${recipe.title}`,
+              // Saves the recipe again; it returns at the top of the box with a new id.
+              run: async () => {
+                await api("POST", "/api/recipes/saved", { recipe: stored });
+                emit("box");
+                toast(`Put ${stored.title} back in your recipe box.`);
+              },
+            });
+            if (byKeyboard) note.querySelector("button").focus();
+          });
+        },
       })
     );
   }

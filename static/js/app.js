@@ -8,7 +8,7 @@ import { initNotes } from "./notes.js";
 import { initPantry, loadPantry, resetPantry } from "./pantry.js";
 import { initRecipes, loadBox, resetRecipes, suggestFor } from "./recipes.js";
 import { initShopping, loadShopping, resetShopping } from "./shopping.js";
-import { busy } from "./ui.js";
+import { busy, toast } from "./ui.js";
 
 const TAB_KEY = "stockpot.tab";
 const THEME_KEY = "stockpot.theme";
@@ -95,6 +95,7 @@ async function enter(me) {
 
 // Shows the login screen and clears everything the last account left on the page.
 function leave(message = "") {
+  if ($("#notes-dialog").open) $("#notes-dialog").close();
   show($("#account"), false);
   show($("#app-view"), false);
   show($("#auth-view"), true);
@@ -110,9 +111,12 @@ function leave(message = "") {
 }
 
 async function start() {
+  // A last resort: every action handles its own errors, but anything missed still gets a readable message.
+  window.addEventListener("unhandledrejection", (event) => {
+    toast(event.reason?.message || "Something went wrong. Please try again.", "error");
+  });
   initTheme();
   initTabs();
-  enterSubmits($("#parse-form"));
   enterSubmits($("#adjust-form"));
   initAuth({ onEnter: enter });
   initPantry();

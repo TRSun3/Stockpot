@@ -8,7 +8,7 @@
   <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="/css/base.css">
   <script>
     // Applies a remembered light or dark choice before the first paint, so the page never flashes.
@@ -18,6 +18,16 @@
     } catch {}
   </script>
   <script type="module" src="/js/app.js"></script>
+  <link rel="modulepreload" href="/js/api.js">
+  <link rel="modulepreload" href="/js/auth.js">
+  <link rel="modulepreload" href="/js/chat.js">
+  <link rel="modulepreload" href="/js/dom.js">
+  <link rel="modulepreload" href="/js/format.js">
+  <link rel="modulepreload" href="/js/notes.js">
+  <link rel="modulepreload" href="/js/pantry.js">
+  <link rel="modulepreload" href="/js/recipes.js">
+  <link rel="modulepreload" href="/js/shopping.js">
+  <link rel="modulepreload" href="/js/ui.js">
 </head>
 <body>
   <a class="skip-link" href="#app-view">Skip to the kitchen</a>
@@ -30,7 +40,6 @@
         <path d="M12 8c0-2 2-2 2-4M18 8c0-2 2-2 2-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".55"/>
       </svg>
       <span class="brand-name">Stockpot</span>
-      <span class="brand-tagline">Cook with what you've got.</span>
     </div>
     <div class="account" id="account" hidden>
       <span class="badge" id="mock-badge" hidden title="Answers come from Stockpot's built-in stand-in, not Gemini">
@@ -49,19 +58,9 @@
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
   <main id="auth-view" class="auth" hidden>
-    <section class="auth-intro" aria-hidden="true">
-      <p class="eyebrow">Your kitchen, remembered</p>
-      <p class="auth-headline">Every ingredient, accounted&nbsp;for.</p>
-      <p class="auth-lede">Stockpot keeps track of what's in your kitchen and when it turns, suggests what to cook from it, and tidies the pantry after you've eaten.</p>
-      <ul class="auth-points">
-        <li>Add groceries the way you'd say them</li>
-        <li>See what to use before it spoils</li>
-        <li>Recipes from your shelves, not a shopping trip</li>
-      </ul>
-    </section>
     <section class="auth-card" aria-labelledby="auth-title">
-      <h1 id="auth-title">Welcome to your kitchen</h1>
-      <p class="muted">Log in, or create an account to start your own pantry.</p>
+      <h1 id="auth-title">Log in to Stockpot</h1>
+      <p class="muted">Track what's in your kitchen, see what expires soon, and get recipes from what you have. New here? Pick a username and password, then choose Create account.</p>
       <form id="auth-form" class="stack" novalidate>
         <label class="field">Username
           <input name="username" autocomplete="username" required minlength="3" maxlength="32">
@@ -89,27 +88,38 @@
 
       <section id="panel-kitchen" role="tabpanel" aria-labelledby="tab-kitchen" class="tabpanel">
         <section class="block" aria-labelledby="soon-title">
-          <header class="block-head">
-            <p class="eyebrow">Before it turns</p>
-            <h2 id="soon-title">Use soon</h2>
+          <header class="block-head split">
+            <div>
+              <h2 id="soon-title">Use soon <span class="count" id="soon-count"></span></h2>
+            </div>
+            <button type="button" class="quiet small collapse-toggle" id="soon-toggle"
+              aria-expanded="true" aria-controls="soon-body" aria-label="Hide Use soon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Hide</span>
+            </button>
           </header>
-          <p class="empty" id="soon-empty" hidden>Nothing is about to expire. Everything on your shelves has time.</p>
-          <ul class="shelf" id="soon-list"></ul>
+          <div id="soon-body">
+            <p class="empty" id="soon-empty" hidden>Nothing expires in the next 3 days.</p>
+            <ul class="shelf" id="soon-list"></ul>
+          </div>
         </section>
 
         <div class="pair">
           <section class="block card" aria-labelledby="add-title">
             <header class="block-head">
-              <p class="eyebrow">Just shopped</p>
               <h2 id="add-title">Add groceries</h2>
             </header>
             <form id="parse-form" class="stack">
-              <label class="field">What did you bring home?
-                <textarea name="text" rows="2" required maxlength="2000"
-                  placeholder="a dozen eggs, a bag of spinach, chicken thighs and some cheddar"></textarea>
-              </label>
+              <ul class="staged" id="staged-list" aria-label="Groceries to add" hidden></ul>
+              <div class="entry-row">
+                <label class="field grow">What did you bring home?
+                  <input id="grocery-entry" maxlength="200" autocomplete="off" placeholder="a dozen eggs">
+                </label>
+                <button type="button" class="secondary" id="stage-add">Add</button>
+              </div>
               <div class="row">
                 <button type="submit" class="primary">Add to pantry</button>
+                <p class="hint">Press Enter after each item.</p>
               </div>
             </form>
             <details class="manual">
@@ -125,8 +135,7 @@
 
           <section class="block card" aria-labelledby="adjust-title">
             <header class="block-head">
-              <p class="eyebrow">Something changed</p>
-              <h2 id="adjust-title">Update in your own words</h2>
+              <h2 id="adjust-title">Update your pantry</h2>
             </header>
             <form id="adjust-form" class="stack">
               <label class="field">What changed?
@@ -142,7 +151,6 @@
         <section class="block" aria-labelledby="pantry-title">
           <header class="block-head split">
             <div>
-              <p class="eyebrow">Everything on hand</p>
               <h2 id="pantry-title">Pantry <span class="count" id="pantry-count"></span></h2>
             </div>
             <label class="filter">
@@ -151,8 +159,8 @@
               <input id="pantry-filter" type="search" placeholder="Search your pantry" aria-label="Filter">
             </label>
           </header>
-          <p class="empty" id="pantry-loading">Opening the cupboards…</p>
-          <p class="empty" id="pantry-empty" hidden>Your pantry is empty. Tell Stockpot what you brought home and it will fill itself in.</p>
+          <p class="empty" id="pantry-loading">Loading…</p>
+          <p class="empty" id="pantry-empty" hidden>Your pantry is empty. Add what you bought above.</p>
           <p class="empty" id="pantry-no-match" hidden>Nothing in your pantry matches that.</p>
           <ul class="ledger" id="pantry-list"></ul>
         </section>
@@ -161,7 +169,6 @@
       <section id="panel-shopping" role="tabpanel" aria-labelledby="tab-shopping" class="tabpanel" hidden>
         <section class="block card list-card" aria-labelledby="shopping-title">
           <header class="block-head">
-            <p class="eyebrow">For the next trip</p>
             <h2 id="shopping-title">Shopping list</h2>
           </header>
           <form id="shopping-form" class="grid-form inline">
@@ -169,12 +176,12 @@
             <label class="field">Note <input name="note" maxlength="500" placeholder="two, unwaxed"></label>
             <button type="submit" class="primary">Add</button>
           </form>
-          <p class="empty" id="shopping-loading">Finding your list…</p>
-          <p class="empty" id="shopping-empty" hidden>Nothing to buy. Missing ingredients from recipes land here too.</p>
+          <p class="empty" id="shopping-loading">Loading…</p>
+          <p class="empty" id="shopping-empty" hidden>Your list is empty. You can also add a recipe's missing ingredients from its card.</p>
           <ul class="checklist" id="shopping-list"></ul>
           <div class="row list-actions">
             <button type="button" id="move-to-pantry" class="primary" disabled>Move checked to pantry</button>
-            <p class="hint">Check things off in the store, then move them home in one go.</p>
+            <p class="hint">Check off what you bought, then move it all to the pantry.</p>
           </div>
           <div id="move-result"></div>
         </section>
@@ -183,7 +190,6 @@
       <section id="panel-recipes" role="tabpanel" aria-labelledby="tab-recipes" class="tabpanel" hidden>
         <section class="block card" aria-labelledby="suggest-title">
           <header class="block-head">
-            <p class="eyebrow">From your shelves</p>
             <h2 id="suggest-title">What should I cook?</h2>
           </header>
           <div class="ask">
@@ -201,7 +207,7 @@
             </form>
           </div>
         </section>
-        <p class="empty centered" id="recipes-empty">Ask for ideas built from what you have, or name a dish to see whether your kitchen can make it.</p>
+        <p class="empty centered" id="recipes-empty">Suggestions use what's in your pantry, starting with what expires first. Or name a dish to see what you'd need.</p>
         <div class="recipes" id="plan-list"></div>
         <div class="recipes" id="recipe-list"></div>
       </section>
@@ -209,35 +215,36 @@
       <section id="panel-box" role="tabpanel" aria-labelledby="tab-box" class="tabpanel" hidden>
         <section class="block" aria-labelledby="box-title">
           <header class="block-head">
-            <p class="eyebrow">Worth making again</p>
             <h2 id="box-title">Recipe box</h2>
           </header>
-          <p class="empty" id="box-empty" hidden>Recipes you save show up here, ready to check against your kitchen any time.</p>
+          <p class="empty" id="box-empty" hidden>Recipes you save appear here.</p>
         </section>
         <div class="recipes" id="box-list"></div>
       </section>
     </div>
 
-    <aside class="chat" aria-labelledby="chat-title">
+    <aside class="chat" id="chat-panel" aria-labelledby="chat-title">
       <header class="chat-head">
-        <div>
-          <p class="eyebrow">At the stove</p>
-          <h2 id="chat-title">Ask the cook</h2>
-        </div>
+        <h2 id="chat-title">Ask the cook</h2>
         <button type="button" class="quiet small" id="chat-clear">Clear</button>
       </header>
       <ol class="messages" id="chat-messages" aria-live="polite"></ol>
       <div class="chat-empty" id="chat-empty" hidden>
-        <p>Tell me how you're feeling or what you're craving, and I'll work with what's in your kitchen.</p>
+        <p>Ask what to make. Answers are based on what's in your pantry.</p>
         <p class="muted">Try “Long day, something cozy” or “What should I use up first?”</p>
       </div>
       <form id="chat-form" class="chat-form">
         <label class="visually-hidden" for="chat-input">Message</label>
         <textarea id="chat-input" name="message" rows="2" required maxlength="2000"
-          placeholder="Long day, I want something warm and comforting, under 30 minutes"></textarea>
+          placeholder="Something quick with the chicken?"></textarea>
         <div class="row">
           <button type="submit" class="primary">Send</button>
           <button type="button" class="quiet" id="chat-to-recipes" hidden>Find recipes for this</button>
+          <button type="button" class="chef-button" id="chat-toggle"
+            aria-expanded="true" aria-controls="chat-panel" aria-label="Minimize the chat" title="Minimize the chat">
+            <svg class="icon-minimize" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 8.5l7 7M15.5 9.5v6h-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="icon-chef" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.6A3.6 3.6 0 0 1 7.6 7.4a4.6 4.6 0 0 1 8.8 0 3.6 3.6 0 0 1 .6 7.2V20H7zM7 17h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          </button>
         </div>
       </form>
     </aside>
@@ -245,7 +252,6 @@
 
   <dialog id="notes-dialog" aria-labelledby="notes-title">
     <form id="notes-form" class="stack">
-      <p class="eyebrow">Always keep in mind</p>
       <h2 id="notes-title">Kitchen notes</h2>
       <p class="muted">Diets, allergies, equipment, who you cook for. Every suggestion and every chat reply respects these.</p>
       <label class="field">Notes

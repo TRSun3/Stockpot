@@ -46,15 +46,15 @@ def clean_recipe(recipe: Recipe, items: dict[int, sqlite3.Row]) -> Recipe | None
     A use that names an item the user doesn't have becomes a missing ingredient instead.
     """
     title = clean_text(recipe.title, 120)
-    steps = [clean_text(step, 500) for step in recipe.steps[:20] if clean_text(step, 500)]
+    steps = [text for step in recipe.steps[:20] if (text := clean_text(step, 500))]
     if not title or not steps:
         return None
     uses, missing, seen = [], [clean_text(name, 80) for name in recipe.missing[:20]], set()
     for use in recipe.uses[:30]:
         item = items.get(use.item_id)
         if item is None:
-            if clean_text(use.name, 80):
-                missing.append(clean_text(use.name, 80))
+            if name := clean_text(use.name, 80):
+                missing.append(name)
         elif use.item_id not in seen:
             seen.add(use.item_id)
             uses.append(RecipeUse(item_id=use.item_id, name=item["name"], amount=clean_text(use.amount, 80)))
@@ -105,11 +105,15 @@ def apply_ops(
     changes, rejected = [], []
     with db.transaction(conn):
         owned = {row["id"]: row for row in pantry.rows(conn, user_id)}
+        owned_ids = set(owned)
+        foods = {pantry.food_key(row["name"]) for row in owned.values()}
         touched: set[int] = set()
         for op in ops[:MOST_ITEMS]:
-            reason = check(op, set(owned), allowed, allow_add, today)
+            reason = check(op, owned_ids, allowed, allow_add, today)
             if reason is None and op.item_id in touched:
                 reason = "that item was already changed"
+            if reason is None and op.op == "add" and pantry.food_key(clean_text(op.name, 80)) in foods:
+                reason = "that's already in the pantry, so it should be updated instead"
             if reason:
                 rejected.append({"op": describe(op), "reason": reason})
                 continue
@@ -118,19 +122,21 @@ def apply_ops(
                 name = name[:1].upper() + name[1:]
                 description = clean_text(op.description, 500)
                 item_id = pantry.insert(conn, user_id, name, description, clean_date(op.expires_on, today))
+                foods.add(pantry.food_key(name))
                 changes.append({"action": "added", "item_id": item_id, "name": name, "description": description})
                 continue
             touched.add(op.item_id)
             item = owned[op.item_id]
             if op.op == "delete":
                 pantry.delete(conn, user_id, op.item_id)
+                foods.discard(pantry.food_key(item["name"]))
                 changes.append({"action": "removed", "item_id": op.item_id, "name": item["name"]})
                 continue
             update = {}
-            if clean_text(op.description, 500):
-                update["description"] = clean_text(op.description, 500)
-            if clean_date(op.expires_on, today):
-                update["expires_on"] = clean_date(op.expires_on, today)
+            if description := clean_text(op.description, 500):
+                update["description"] = description
+            if expires_on := clean_date(op.expires_on, today):
+                update["expires_on"] = expires_on
             pantry.update(conn, user_id, op.item_id, update)
             changes.append(
                 {

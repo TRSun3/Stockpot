@@ -5,6 +5,8 @@ from datetime import timedelta
 import pytest
 from conftest import TODAY
 
+from stockpot import pantry
+
 
 def day(offset):
     return (TODAY + timedelta(days=offset)).isoformat()
@@ -71,6 +73,41 @@ def test_editing_changes_only_the_fields_sent_and_null_clears_the_expiry(neal):
     )
     cleared = neal.patch(f"/api/items/{item['id']}", json={"expires_on": None}).json()
     assert (cleared["expires_on"], cleared["status"]) == (None, "none")
+
+
+@pytest.mark.parametrize(
+    "first, second",
+    [
+        ("Eggs", " egg "),
+        ("Tomatoes", "tomato"),
+        ("Berries", "berry"),
+        ("Chicken thighs", "CHICKEN THIGH"),
+        ("Peaches", "peach"),
+        ("Radishes", "radish"),
+        ("Boxes", "box"),
+        ("Cookies", "cookie"),
+        ("Brownies", "brownie"),
+        ("Eggs.", "egg"),
+        ("Glasses", "glass"),
+    ],
+)
+def test_the_same_food_matches_however_its_name_is_written(first, second):
+    assert pantry.food_key(first) == pantry.food_key(second)
+
+
+@pytest.mark.parametrize("first, second", [("Eggs", "Eggplant"), ("Pie", "Pear"), ("Turkey", "Turnip")])
+def test_different_foods_never_match(first, second):
+    assert pantry.food_key(first) != pantry.food_key(second)
+
+
+def test_an_item_cannot_be_renamed_to_a_food_already_in_the_pantry(neal):
+    add(neal, "Eggs", description="a dozen")
+    milk = add(neal, "Milk")
+    response = neal.patch(f"/api/items/{milk['id']}", json={"name": "egg"})
+    assert response.status_code == 409
+    assert response.json()["error"] == "Eggs is already in your pantry. Edit that one instead."
+    assert neal.patch(f"/api/items/{milk['id']}", json={"name": "Oat milk"}).status_code == 200
+    assert neal.patch(f"/api/items/{milk['id']}", json={"name": "oat milks"}).status_code == 200
 
 
 def test_a_discarded_item_is_gone(neal):
