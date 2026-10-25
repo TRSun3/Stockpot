@@ -14,6 +14,9 @@ Choices made where the brief was silent or where the project deviates from it, a
 ## The AI Layer
 
 - **Partial application of LLM changes.** The brief offered all-or-nothing or valid-only for a batch with a bad op. Stockpot applies the valid ops in one transaction and reports each refused op with its reason. If one hallucinated item id blocked a whole cooking update, the user would have to fix the pantry by hand, and the refused op is shown either way.
+- **An update may change only the expiry.** The brief calls an update without a description malformed. Stockpot also accepts an update whose only change is a valid new expiry, because "I froze the chicken" or "I took it out of the freezer" changes when food goes bad, not what it is. An update with neither is still refused.
+- **Parsing groceries doesn't see the pantry.** The brief's prompt rule asks for the pantry in every system prompt, but `parse_items(text, today)` describes food that isn't in the pantry yet, so its prompt carries only today's date.
+- **Moving shopping into the pantry keeps the user's own names and notes.** The LLM only estimates each entry's expiry from its name. Passing notes through the parser split notes like "for Spinach and Cheddar Omelette" into extra items, and an entry the LLM dropped (like paper towels) vanished from both lists.
 - **Cooking may only touch the recipe's own items.** `apply_ops` takes the set of item ids the recipe used and refuses changes to anything else, in addition to refusing foreign or missing ids.
 - **Recipe uses that name unknown items become missing ingredients** rather than errors. Fixing the answer keeps a useful recipe on screen.
 - **Parsed dates outside 30 days ago to 5 years ahead become "no expiry"**, rather than dropping the item.

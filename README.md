@@ -44,9 +44,11 @@ Without a `GEMINI_API_KEY` in `.env`, Stockpot runs on a built-in mock AI so eve
 uv run pytest
 uv run pytest --browser
 uv run ruff check .
+uv run python -m evals.run_evals
+uv run python -m bench.run_bench
 ```
 
-`--browser` also runs the demo end to end in Microsoft Edge against a live server and saves screenshots to `screenshots/`.
+`--browser` also runs the demo end to end in Microsoft Edge against a live server and saves screenshots to `screenshots/`. The evals check the AI's answers scenario by scenario, and the benchmarks time a live server. What was run before release and what it found is in [VERIFICATION.md](docs/VERIFICATION.md).
 
 ## The Components
 
@@ -56,6 +58,8 @@ uv run ruff check .
 | Database | `stockpot/db.py` | [DATA.md](docs/DATA.md) |
 | AI layer | `stockpot/llm/`, `stockpot/guard.py` | [LLM.md](docs/LLM.md) |
 | Frontend | `static/` | [FRONTEND.md](docs/FRONTEND.md) |
+| Evals | `evals/` | [EVALS.md](docs/EVALS.md) |
+| Benchmarks | `bench/` | [BENCH.md](docs/BENCH.md) |
 
 ## Conventions
 

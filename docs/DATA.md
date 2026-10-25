@@ -6,7 +6,7 @@ Stockpot keeps everything in one SQLite file, `stockpot.db` in the repository ro
 
 When the app starts, `db.init` creates the file and every table that is missing. Running it on an existing database changes nothing, so restarts keep all data. The database runs in WAL mode so reads never wait on a write.
 
-Every connection turns foreign keys on, so deleting a user deletes their sessions, items, shopping list, and chat. Connections run in autocommit mode. A change that spans several statements runs inside `db.transaction`, which commits all of it or none of it.
+Every connection turns foreign keys on, so deleting a user deletes their sessions, items, shopping list, chat, kitchen notes, and saved recipes. Connections run in autocommit mode with `synchronous = NORMAL`, which WAL makes safe. Requests borrow connections from a pool kept open for the life of the app, because opening the file is the slow part of a request on Windows (see VERIFICATION.md). A change that spans several statements runs inside `db.transaction`, which commits all of it or none of it.
 
 ## Tables
 

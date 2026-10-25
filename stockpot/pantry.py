@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 
 from stockpot.auth import Conn, CurrentUser
-from stockpot.deps import Today
+from stockpot.deps import RowId, Today
 from stockpot.schemas import ItemIn, ItemPatch, PantryItem
 
 SOON_DAYS = 3
@@ -116,19 +116,19 @@ def expiring(
 
 
 @router.get("/{item_id}")
-def get_item(item_id: int, user: CurrentUser, conn: Conn, today: Today) -> dict:
+def get_item(item_id: RowId, user: CurrentUser, conn: Conn, today: Today) -> dict:
     return to_json(found(conn, user.id, item_id), today)
 
 
 @router.patch("/{item_id}")
-def edit_item(item_id: int, body: ItemPatch, user: CurrentUser, conn: Conn, today: Today) -> dict:
+def edit_item(item_id: RowId, body: ItemPatch, user: CurrentUser, conn: Conn, today: Today) -> dict:
     found(conn, user.id, item_id)
     update(conn, user.id, item_id, body.changes())
     return to_json(row(conn, user.id, item_id), today)
 
 
 @router.delete("/{item_id}")
-def discard_item(item_id: int, user: CurrentUser, conn: Conn) -> dict:
+def discard_item(item_id: RowId, user: CurrentUser, conn: Conn) -> dict:
     if not delete(conn, user.id, item_id):
         raise HTTPException(404, "That item isn't in your pantry.")
     return {"ok": True}

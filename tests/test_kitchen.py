@@ -103,3 +103,29 @@ def test_an_llm_failure_answers_with_a_friendly_error_and_changes_nothing(app, n
     assert neal.post("/api/shopping/move-to-pantry").status_code == 502
     assert list(pantry_of(neal)) == ["Milk"]
     assert neal.get("/api/shopping").json()[0]["checked"] is True
+
+
+class Picky(Mock):
+    """Parses only food it recognizes, the way Gemini ignores non-food."""
+
+    def parse_items(self, text, today):
+        return [item for item in super().parse_items(text, today) if item.name != "Paper towels"]
+
+
+def test_moved_shopping_keeps_its_own_names_and_notes_even_when_notes_read_like_lists(app, neal):
+    app.state.llm = Picky(delay=0)
+    for name, note in [
+        ("Spinach", "for Spinach and Cheddar Omelette"),
+        ("Lemons", "two, organic"),
+        ("Paper towels", ""),
+    ]:
+        entry = neal.post("/api/shopping", json={"name": name, "note": note}).json()
+        neal.patch(f"/api/shopping/{entry['id']}", json={"checked": True})
+    moved = neal.post("/api/shopping/move-to-pantry").json()["moved"]
+    assert [(item["name"], item["description"]) for item in moved] == [
+        ("Spinach", "for Spinach and Cheddar Omelette"),
+        ("Lemons", "two, organic"),
+        ("Paper towels", ""),
+    ]
+    assert moved[0]["days_left"] == 5 and moved[2]["expires_on"] is None
+    assert neal.get("/api/shopping").json() == []

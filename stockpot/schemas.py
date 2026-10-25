@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
@@ -130,6 +130,13 @@ class SuggestIn(BaseModel):
 
 class PlanIn(BaseModel):
     dish: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+    @field_validator("dish")
+    @classmethod
+    def names_something(cls, dish: str) -> str:
+        if not any(character.isalpha() for character in dish):
+            raise ValueError("name a dish, like carbonara")
+        return dish
 
 
 class TweakIn(BaseModel):

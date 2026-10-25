@@ -5,6 +5,7 @@ import sqlite3
 from fastapi import APIRouter, HTTPException
 
 from stockpot.auth import Conn, CurrentUser
+from stockpot.deps import RowId
 from stockpot.schemas import ShoppingIn, ShoppingPatch
 
 router = APIRouter(prefix="/api/shopping")
@@ -52,7 +53,7 @@ def add_entry(body: ShoppingIn, user: CurrentUser, conn: Conn) -> dict:
 
 
 @router.patch("/{entry_id}")
-def edit_entry(entry_id: int, body: ShoppingPatch, user: CurrentUser, conn: Conn) -> dict:
+def edit_entry(entry_id: RowId, body: ShoppingPatch, user: CurrentUser, conn: Conn) -> dict:
     found(conn, user.id, entry_id)
     changes = body.changes()
     if changes:
@@ -65,7 +66,7 @@ def edit_entry(entry_id: int, body: ShoppingPatch, user: CurrentUser, conn: Conn
 
 
 @router.delete("/{entry_id}")
-def remove_entry(entry_id: int, user: CurrentUser, conn: Conn) -> dict:
+def remove_entry(entry_id: RowId, user: CurrentUser, conn: Conn) -> dict:
     cursor = conn.execute("DELETE FROM shopping_items WHERE id = ? AND user_id = ?", (entry_id, user.id))
     if cursor.rowcount != 1:
         raise HTTPException(404, "That isn't on your shopping list.")

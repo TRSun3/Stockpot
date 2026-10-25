@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
@@ -15,6 +15,8 @@ from stockpot import auth, chat, config, db, kitchen, pantry, preferences, recip
 from stockpot.llm import LLM, UNAVAILABLE, LLMError, get_llm
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
+
+MAX_BODY = 256 * 1024
 
 log = logging.getLogger("uvicorn.error")
 
@@ -34,9 +36,11 @@ def create_app(settings: config.Settings | None = None, llm: LLM | None = None) 
         db.init(settings.db_path)
         log.info("Stockpot is using the %s LLM backend.", settings.backend)
         yield
+        app.state.pool.close()
 
     app = FastAPI(title="Stockpot", lifespan=lifespan)
     app.state.settings = settings
+    app.state.pool = db.Pool(settings.db_path)
     app.state.today = date.today
     app.state.llm = llm or get_llm(settings)
 
@@ -52,6 +56,19 @@ def create_app(settings: config.Settings | None = None, llm: LLM | None = None) 
     async def llm_error(request: Request, error: LLMError) -> JSONResponse:
         log.warning("LLM call failed: %s", error)
         return JSONResponse({"error": UNAVAILABLE}, status_code=502)
+
+    @app.exception_handler(Exception)
+    async def server_error(request: Request, error: Exception) -> JSONResponse:
+        log.exception("Unhandled error on %s %s", request.method, request.url.path, exc_info=error)
+        return JSONResponse({"error": "Something went wrong on our side. Please try again."}, status_code=500)
+
+    @app.middleware("http")
+    async def limit_body(request: Request, call_next) -> Response:
+        """Refuses request bodies over 256 KB before reading them; nothing Stockpot accepts comes close."""
+        length = request.headers.get("content-length", "0")
+        if not length.isdigit() or int(length) > MAX_BODY:
+            return JSONResponse({"error": "That request is too large."}, status_code=413)
+        return await call_next(request)
 
     @app.get("/api/health")
     def health() -> dict:

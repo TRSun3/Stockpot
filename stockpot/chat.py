@@ -3,7 +3,6 @@
 import json
 import sqlite3
 from collections.abc import Iterator
-from contextlib import closing
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
@@ -41,8 +40,8 @@ def history(user: CurrentUser, conn: Conn) -> list[dict]:
 def send(body: ChatIn, request: Request, user: CurrentUser, conn: Conn, today: Today, llm: Model) -> StreamingResponse:
     """Streams the reply as server-sent events: `text` pieces, then `done`, or an `error`.
 
-    Both messages are saved once the reply finishes. If the LLM fails before saying anything, the user's
-    message is removed again so a retry doesn't repeat it.
+    Both messages are saved together once the reply ends, including a reply cut off partway. If the LLM
+    never says anything, neither is saved, so a retry doesn't repeat the question.
     """
     turns = [ChatTurn(role=row["role"], content=row["content"]) for row in messages(conn, user.id, HISTORY)]
     kitchen = pantry.for_llm(conn, user.id)
@@ -51,10 +50,7 @@ def send(body: ChatIn, request: Request, user: CurrentUser, conn: Conn, today: T
         for row in shopping.rows(conn, user.id)
     ]
     notes = preferences.notes(conn, user.id)
-    asked = conn.execute(
-        "INSERT INTO chat_messages (user_id, role, content) VALUES (?, 'user', ?)", (user.id, body.message)
-    ).lastrowid
-    db_path = request.app.state.settings.db_path
+    pool = request.app.state.pool
 
     def stream() -> Iterator[str]:
         pieces: list[str] = []
@@ -67,14 +63,12 @@ def send(body: ChatIn, request: Request, user: CurrentUser, conn: Conn, today: T
                 yield event({"type": "error", "error": UNAVAILABLE})
         finally:
             reply = "".join(pieces).strip()
-            with closing(db.connect(db_path)) as writer:
-                if reply:
-                    writer.execute(
-                        "INSERT INTO chat_messages (user_id, role, content) VALUES (?, 'assistant', ?)",
-                        (user.id, reply),
+            if reply:
+                with pool.connection() as writer, db.transaction(writer):
+                    writer.executemany(
+                        "INSERT INTO chat_messages (user_id, role, content) VALUES (?, ?, ?)",
+                        [(user.id, "user", body.message), (user.id, "assistant", reply)],
                     )
-                else:
-                    writer.execute("DELETE FROM chat_messages WHERE id = ? AND user_id = ?", (asked, user.id))
         yield event({"type": "done"})
 
     return StreamingResponse(

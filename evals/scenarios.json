@@ -1,0 +1,284 @@
+{
+  "kitchens": {
+    "weeknight": [
+      {"id": 11, "name": "Spinach", "description": "a bag of baby spinach", "days": 1},
+      {"id": 12, "name": "Eggs", "description": "a dozen large eggs", "days": 18},
+      {"id": 13, "name": "Cheddar", "description": "a block of sharp cheddar", "days": 24},
+      {"id": 14, "name": "Chicken thighs", "description": "2 lbs, bone-in", "days": 2},
+      {"id": 15, "name": "Tomatoes", "description": "4 vine tomatoes", "days": 3},
+      {"id": 16, "name": "Garlic", "description": "a head of garlic", "days": 40},
+      {"id": 17, "name": "Pasta", "description": "a box of spaghetti", "days": null},
+      {"id": 18, "name": "Rice", "description": "a bag of jasmine rice", "days": null},
+      {"id": 19, "name": "Milk", "description": "about half a gallon of 2% milk", "days": 4},
+      {"id": 20, "name": "Greek yogurt", "description": "a tub, opened last week", "days": -2},
+      {"id": 21, "name": "Butter", "description": "1 stick, salted", "days": 30},
+      {"id": 22, "name": "Onions", "description": "2 yellow onions", "days": 25}
+    ],
+    "single": [
+      {"id": 31, "name": "Eggs", "description": "6 eggs", "days": 10}
+    ],
+    "pantry_staples": [
+      {"id": 41, "name": "Rice", "description": "a big bag", "days": null},
+      {"id": 42, "name": "Black beans", "description": "2 cans", "days": null},
+      {"id": 43, "name": "Pasta", "description": "a box of penne", "days": null},
+      {"id": 44, "name": "Soy sauce", "description": "a bottle", "days": null}
+    ],
+    "empty": []
+  },
+  "scenarios": [
+    {
+      "id": "parse-basic-groceries",
+      "method": "parse_items",
+      "input": {"text": "a dozen eggs, half gallon of milk and 3 bananas"},
+      "checks": [
+        {"check": "count", "min": 3, "max": 3},
+        {"check": "names_include", "words": ["egg", "milk", "banana"]},
+        {"check": "quantities_kept", "words": ["dozen", "half", "3"]},
+        {"check": "expiry_within", "item": "egg", "min": 7, "max": 60},
+        {"check": "expiry_within", "item": "milk", "min": 3, "max": 14},
+        {"check": "expiry_within", "item": "banana", "min": 2, "max": 10}
+      ]
+    },
+    {
+      "id": "parse-demo-sentence",
+      "method": "parse_items",
+      "input": {"text": "just got back from the store: a dozen eggs, a bag of spinach, chicken thighs and some cheddar"},
+      "checks": [
+        {"check": "count", "min": 4, "max": 4},
+        {"check": "names_include", "words": ["egg", "spinach", "chicken", "cheddar"]},
+        {"check": "expiry_within", "item": "chicken", "min": 1, "max": 4},
+        {"check": "expiry_within", "item": "spinach", "min": 3, "max": 10}
+      ]
+    },
+    {
+      "id": "parse-shelf-stable-goods",
+      "method": "parse_items",
+      "input": {"text": "a bag of rice, two cans of black beans, a box of spaghetti and fresh salmon"},
+      "checks": [
+        {"check": "count", "min": 4, "max": 4},
+        {"check": "long_or_no_expiry", "item": "rice", "min": 180},
+        {"check": "long_or_no_expiry", "item": "bean", "min": 180},
+        {"check": "long_or_no_expiry", "item": "spaghetti", "min": 180},
+        {"check": "expiry_within", "item": "salmon", "min": 1, "max": 4}
+      ]
+    },
+    {
+      "id": "parse-one-item-per-line",
+      "method": "parse_items",
+      "input": {"text": "Milk (2%)\nSpinach\nLemons (two)"},
+      "checks": [
+        {"check": "count", "min": 3, "max": 3},
+        {"check": "names_include", "words": ["milk", "spinach", "lemon"]},
+        {"check": "names_exclude", "words": ["(", "%"]}
+      ]
+    },
+    {
+      "id": "parse-nonsense",
+      "method": "parse_items",
+      "input": {"text": "asdf"},
+      "checks": [{"check": "count", "min": 0, "max": 1}, {"check": "valid_items"}]
+    },
+    {
+      "id": "parse-very-long-list",
+      "method": "parse_items",
+      "input": {"repeat": "eggs, milk, spinach, cheddar, rice, ", "times": 30},
+      "checks": [{"check": "count", "min": 5, "max": 150}, {"check": "valid_items"}]
+    },
+    {
+      "id": "suggest-uses-expiring-spinach",
+      "method": "suggest_recipes",
+      "kitchen": "weeknight",
+      "input": {"preferences": ""},
+      "checks": [
+        {"check": "recipe_count", "min": 1, "max": 6},
+        {"check": "only_known_ids"},
+        {"check": "some_recipe_uses", "item_id": 11},
+        {"check": "never_uses", "item_ids": [20]},
+        {"check": "top_missing_at_most", "top": 3, "max": 2},
+        {"check": "recipes_complete"}
+      ]
+    },
+    {
+      "id": "suggest-vegetarian-preference",
+      "method": "suggest_recipes",
+      "kitchen": "weeknight",
+      "input": {"preferences": "something vegetarian"},
+      "checks": [
+        {"check": "recipe_count", "min": 1, "max": 6},
+        {"check": "only_known_ids"},
+        {"check": "never_uses", "item_ids": [14]}
+      ]
+    },
+    {
+      "id": "suggest-respects-kitchen-notes",
+      "method": "suggest_recipes",
+      "kitchen": "weeknight",
+      "input": {"preferences": "", "notes": "I'm vegetarian."},
+      "checks": [{"check": "recipe_count", "min": 1, "max": 6}, {"check": "never_uses", "item_ids": [14]}]
+    },
+    {
+      "id": "suggest-quick-when-tired",
+      "method": "suggest_recipes",
+      "kitchen": "weeknight",
+      "input": {"preferences": "I'm exhausted, something under 20 minutes"},
+      "checks": [{"check": "recipe_count", "min": 1, "max": 6}, {"check": "first_recipe_minutes_at_most", "max": 25}]
+    },
+    {
+      "id": "suggest-empty-pantry",
+      "method": "suggest_recipes",
+      "kitchen": "empty",
+      "input": {"preferences": ""},
+      "checks": [{"check": "recipe_count", "min": 0, "max": 6}, {"check": "only_known_ids"}]
+    },
+    {
+      "id": "suggest-single-item",
+      "method": "suggest_recipes",
+      "kitchen": "single",
+      "input": {"preferences": ""},
+      "checks": [{"check": "recipe_count", "min": 0, "max": 6}, {"check": "only_known_ids"}]
+    },
+    {
+      "id": "suggest-no-expiry-pantry",
+      "method": "suggest_recipes",
+      "kitchen": "pantry_staples",
+      "input": {"preferences": ""},
+      "checks": [{"check": "recipe_count", "min": 0, "max": 6}, {"check": "only_known_ids"}]
+    },
+    {
+      "id": "plan-carbonara",
+      "method": "plan_recipe",
+      "kitchen": "weeknight",
+      "input": {"dish": "carbonara"},
+      "checks": [
+        {"check": "title_contains", "words": ["carbonara"]},
+        {"check": "only_known_ids"},
+        {"check": "recipe_uses", "item_ids": [12, 17]},
+        {"check": "missing_includes", "words": ["bacon"]}
+      ]
+    },
+    {
+      "id": "tweak-vegetarian",
+      "method": "tweak_recipe",
+      "kitchen": "weeknight",
+      "input": {
+        "feedback": "make it vegetarian",
+        "recipe": {
+          "title": "Creamy Garlic Chicken Thighs",
+          "summary": "Chicken thighs in a garlicky cream sauce.",
+          "time_minutes": 30,
+          "uses": [
+            {"item_id": 14, "name": "Chicken thighs", "amount": "all of them"},
+            {"item_id": 16, "name": "Garlic", "amount": "4 cloves"},
+            {"item_id": 19, "name": "Milk", "amount": "1 cup"},
+            {"item_id": 11, "name": "Spinach", "amount": "2 handfuls"}
+          ],
+          "missing": [],
+          "steps": ["Sear the chicken thighs.", "Soften the garlic.", "Add the milk and simmer.", "Stir in the spinach and return the chicken."],
+          "why": ""
+        }
+      },
+      "checks": [{"check": "only_known_ids"}, {"check": "never_uses", "item_ids": [14]}, {"check": "recipes_complete"}]
+    },
+    {
+      "id": "cook-omelette",
+      "method": "apply_cooking",
+      "kitchen": "weeknight",
+      "input": {
+        "recipe": {
+          "title": "Spinach and Cheddar Omelette",
+          "summary": "",
+          "time_minutes": 10,
+          "uses": [
+            {"item_id": 12, "name": "Eggs", "amount": "3 eggs"},
+            {"item_id": 11, "name": "Spinach", "amount": "a big handful"},
+            {"item_id": 13, "name": "Cheddar", "amount": "a small handful, grated"}
+          ],
+          "missing": [],
+          "steps": ["Whisk the eggs.", "Wilt the spinach.", "Cook and fold with cheddar."],
+          "why": ""
+        }
+      },
+      "checks": [
+        {"check": "ops_only_recipe_items"},
+        {"check": "ops_count", "min": 1, "max": 3},
+        {"check": "no_adds"},
+        {"check": "updates_have_descriptions"},
+        {"check": "op_is", "item_id": 12, "op": "update", "description_has": ["9"]}
+      ]
+    },
+    {
+      "id": "cook-uses-everything",
+      "method": "apply_cooking",
+      "kitchen": "single",
+      "input": {
+        "recipe": {
+          "title": "Six-Egg Frittata",
+          "summary": "",
+          "time_minutes": 20,
+          "uses": [{"item_id": 31, "name": "Eggs", "amount": "all 6 eggs"}],
+          "missing": [],
+          "steps": ["Whisk and bake."],
+          "why": ""
+        }
+      },
+      "checks": [{"check": "ops_only_recipe_items"}, {"check": "op_is", "item_id": 31, "op": "delete"}]
+    },
+    {
+      "id": "adjust-plain-words",
+      "method": "adjust_pantry",
+      "kitchen": "weeknight",
+      "input": {"instruction": "I used half the milk, the spinach went bad, and I bought a loaf of bread"},
+      "checks": [
+        {"check": "op_is", "item_id": 19, "op": "update"},
+        {"check": "op_is", "item_id": 11, "op": "delete"},
+        {"check": "adds_include", "words": ["bread"]},
+        {"check": "ops_only_items", "item_ids": [19, 11]},
+        {"check": "updates_have_descriptions"}
+      ]
+    },
+    {
+      "id": "adjust-freezing-extends-expiry",
+      "method": "adjust_pantry",
+      "kitchen": "weeknight",
+      "input": {"instruction": "I froze the chicken thighs"},
+      "checks": [
+        {"check": "op_is", "item_id": 14, "op": "update"},
+        {"check": "op_expiry_at_least", "item_id": 14, "min": 30},
+        {"check": "ops_only_items", "item_ids": [14]}
+      ]
+    },
+    {
+      "id": "adjust-nothing-changed",
+      "method": "adjust_pantry",
+      "kitchen": "weeknight",
+      "input": {"instruction": "what a lovely day"},
+      "checks": [{"check": "ops_count", "min": 0, "max": 0}]
+    },
+    {
+      "id": "chat-cozy-and-tired",
+      "method": "chat",
+      "kitchen": "weeknight",
+      "input": {"message": "I'm exhausted and want something cozy"},
+      "checks": [
+        {"check": "reply_nonempty"},
+        {"check": "mentions_pantry_item"},
+        {"check": "no_invented_items", "words": ["your salmon", "your shrimp", "your bacon", "your tofu", "your mushroom", "your beef"]},
+        {"check": "reply_words_at_most", "max": 200}
+      ]
+    },
+    {
+      "id": "chat-avoids-expired",
+      "method": "chat",
+      "kitchen": "weeknight",
+      "input": {"message": "anything I should use up?"},
+      "checks": [{"check": "reply_nonempty"}, {"check": "mentions_pantry_item"}]
+    },
+    {
+      "id": "chat-empty-pantry",
+      "method": "chat",
+      "kitchen": "empty",
+      "input": {"message": "what can I make tonight?"},
+      "checks": [{"check": "reply_nonempty"}, {"check": "no_invented_items", "words": ["your eggs", "your chicken", "your spinach"]}]
+    }
+  ]
+}

@@ -7,8 +7,10 @@ from fastapi import APIRouter, HTTPException
 
 from stockpot import guard, pantry, preferences, shopping
 from stockpot.auth import Conn, CurrentUser
-from stockpot.deps import Model, Today
+from stockpot.deps import Model, RowId, Today
 from stockpot.schemas import MissingIn, PlanIn, Recipe, RecipeIn, SuggestIn, TweakIn
+
+SUGGESTIONS = 4
 
 router = APIRouter(prefix="/api/recipes")
 
@@ -31,7 +33,7 @@ def suggest(body: SuggestIn, user: CurrentUser, conn: Conn, today: Today, llm: M
         pantry.for_llm(conn, user.id), today, body.preferences, preferences.notes(conn, user.id)
     )
     items = owned(conn, user.id)
-    cleaned = [guard.clean_recipe(recipe, items) for recipe in recipes[:6]]
+    cleaned = [guard.clean_recipe(recipe, items) for recipe in recipes[:SUGGESTIONS]]
     return {"recipes": [recipe.model_dump() for recipe in cleaned if recipe]}
 
 
@@ -45,8 +47,11 @@ def plan(body: PlanIn, user: CurrentUser, conn: Conn, today: Today, llm: Model) 
 @router.post("/tweak")
 def tweak(body: TweakIn, user: CurrentUser, conn: Conn, today: Today, llm: Model) -> dict:
     """The recipe revised to follow the user's feedback, like "make it spicier" or "no oven"."""
+    given = guard.clean_recipe(body.recipe, owned(conn, user.id))
+    if given is None:
+        raise HTTPException(422, "A recipe needs a title and at least one step.")
     recipe = llm.tweak_recipe(
-        body.recipe, body.feedback, pantry.for_llm(conn, user.id), today, preferences.notes(conn, user.id)
+        given, body.feedback, pantry.for_llm(conn, user.id), today, preferences.notes(conn, user.id)
     )
     return {"recipe": usable(recipe, conn, user.id)}
 
@@ -97,7 +102,7 @@ def save(body: RecipeIn, user: CurrentUser, conn: Conn) -> dict:
 
 
 @router.delete("/saved/{saved_id}")
-def unsave(saved_id: int, user: CurrentUser, conn: Conn) -> dict:
+def unsave(saved_id: RowId, user: CurrentUser, conn: Conn) -> dict:
     cursor = conn.execute("DELETE FROM saved_recipes WHERE id = ? AND user_id = ?", (saved_id, user.id))
     if cursor.rowcount != 1:
         raise HTTPException(404, "That recipe isn't in your recipe box.")

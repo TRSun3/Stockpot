@@ -143,3 +143,73 @@ def test_the_same_question_always_gets_the_same_answer():
     for _ in range(3):
         assert mock.suggest_recipes(KITCHEN, TODAY, "cozy") == mock.suggest_recipes(KITCHEN, TODAY, "cozy")
         assert list(mock.chat([], "hello", KITCHEN, [], TODAY)) == list(mock.chat([], "hello", KITCHEN, [], TODAY))
+
+
+def test_parentheses_hold_a_note_together_and_expiry_comes_from_the_food():
+    items = mock.parse_items("Lemons (two, organic), Bread (for grilled cheese and tomato soup)", TODAY)
+    assert [(i.name, i.description) for i in items] == [
+        ("Lemons", "Two, organic"),
+        ("Bread", "For grilled cheese and tomato soup"),
+    ]
+    assert items[1].expires_on == (TODAY + timedelta(days=5)).isoformat()
+
+
+def test_what_someone_cannot_eat_keeps_its_scope_and_covers_whole_food_families():
+    pantry = [*KITCHEN, item(8, "Salmon", "2 fillets", 1), item(9, "Asparagus", "a bunch", 2), item(10, "Lemon", "", 9)]
+    no_dairy = mock.suggest_recipes(pantry, TODAY, "no dairy but love eggs")
+    assert no_dairy and any(use.name == "Eggs" for recipe in no_dairy for use in recipe.uses)
+    assert not any(use.name == "Cheddar" for recipe in no_dairy for use in recipe.uses)
+    titles = [recipe.title for recipe in mock.suggest_recipes(pantry, TODAY, "", "allergic to fish")]
+    assert not any("Salmon" in title for title in titles)
+    stovetop = [recipe.title for recipe in mock.suggest_recipes(pantry, TODAY, "", "No oven, just a stovetop.")]
+    assert not any("Salmon" in title for title in stovetop)
+
+
+def test_optional_extras_the_user_avoids_are_left_out():
+    pantry = [*KITCHEN, item(8, "Butter", "a stick", 20)]
+    omelette = mock.plan_recipe("omelette", pantry, TODAY, "no butter")
+    assert "Butter" not in [use.name for use in omelette.uses]
+
+
+def test_asking_for_it_milder_takes_heat_away():
+    recipe = mock.tweak_recipe(mock.plan_recipe("omelette", KITCHEN, TODAY), "spicier", KITCHEN, TODAY)
+    milder = mock.tweak_recipe(recipe, "make it less spicy", KITCHEN, TODAY)
+    assert not milder.title.startswith("Spicy") and "chili flakes" not in milder.missing
+
+
+def test_everyday_adjustments_read_the_way_people_mean_them():
+    pantry = [*KITCHEN, item(8, "Chicken thighs", "2 lbs", 60)]
+    thawed = {
+        op.item_id: op for op in mock.adjust_pantry("I took the chicken thighs out of the freezer", pantry, TODAY)
+    }
+    assert thawed[8].op == "update" and thawed[8].expires_on == (TODAY + timedelta(days=2)).isoformat()
+    half = mock.adjust_pantry("I finished half the milk", pantry, TODAY)
+    assert [(op.op, op.item_id) for op in half] == [("update", 7)]
+    bought = mock.adjust_pantry("I bought chocolate and milk", pantry, TODAY)
+    assert all(op.op != "update" or "partly" not in (op.description or "") for op in bought)
+
+
+def test_dishes_match_by_whole_words_and_never_use_expired_items():
+    assert mock.plan_recipe("tea", KITCHEN, TODAY).title == "Tea"
+    assert mock.plan_recipe("fruit salad", KITCHEN, TODAY).title == "Fruit salad"
+    plan = mock.plan_recipe("milk pudding", KITCHEN, TODAY)
+    assert 7 not in [use.item_id for use in plan.uses]
+
+
+def test_cooking_counts_down_bare_numbers_and_never_subtracts_measures():
+    pantry = [item(1, "Avocados", "2 ripe avocados", 2), item(2, "Tomatoes", "4 vine tomatoes", 3)]
+    recipe = Recipe(
+        title="Toast",
+        summary="",
+        time_minutes=5,
+        uses=[
+            RecipeUse(item_id=1, name="Avocados", amount="1"),
+            RecipeUse(item_id=2, name="Tomatoes", amount="2 cups, halved"),
+        ],
+        missing=[],
+        steps=["Go."],
+        why="",
+    )
+    ops = {op.item_id: op for op in mock.apply_cooking(recipe, pantry, TODAY)}
+    assert ops[1].description == "1 ripe avocado"
+    assert ops[2].description == "4 vine tomatoes — partly used"

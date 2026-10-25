@@ -8,7 +8,7 @@ Stockpot's AI is Google Gemini, reached through the `google-genai` SDK. Until a 
 
 ## What The LLM Does
 
-Both backends implement the interface in `stockpot/llm/base.py`. Every method sees the user's real pantry: item id, name, description, and expiry.
+Both backends implement the interface in `stockpot/llm/base.py`. Every method except `parse_items` sees the user's real pantry: item id, name, description, and expiry. Parsing only needs today's date, since it describes new food rather than existing items.
 
 | Method | Turns | Into |
 |---|---|---|
@@ -37,7 +37,7 @@ When a Gemini call fails or times out (45 seconds), or answers with something th
 
 ## Gemini
 
-`stockpot/llm/gemini.py` asks for JSON (`response_mime_type="application/json"`) with the Pydantic model as `response_schema` for every method except chat. Chat streams through `generate_content_stream`, sending the last 20 messages as history. Every prompt lives in `stockpot/llm/prompts.py`. Each one carries today's date, the pantry with item ids and how many days each item has left, and an instruction to refer only to listed item ids.
+`stockpot/llm/gemini.py` asks for JSON (`response_mime_type="application/json"`) with the Pydantic model as `response_schema` for every method except chat. Chat streams through `generate_content_stream`, sending the last 20 messages as history. Every prompt lives in `stockpot/llm/prompts.py`. Each carries today's date. Every prompt about the existing kitchen also carries the pantry with item ids and how many days each item has left, and the user's kitchen notes where they apply. The structured prompts tell the model to refer only to listed item ids; the chat prompt tells it to mention only listed items.
 
 ## The Mock
 

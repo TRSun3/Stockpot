@@ -99,3 +99,10 @@ def test_another_account_cannot_see_or_touch_an_item(neal, tianyue):
     assert tianyue.patch(path, json={"description": "gone"}).status_code == 404
     assert tianyue.delete(path).status_code == 404
     assert neal.get(path).json() == item
+
+
+def test_an_id_too_large_for_the_database_is_refused_cleanly(neal):
+    for method in ("get", "patch", "delete"):
+        response = neal.request(method, "/api/items/9223372036854775808", json={} if method == "patch" else None)
+        assert response.status_code == 422, method
+    assert neal.delete("/api/shopping/99999999999999999999").status_code == 422

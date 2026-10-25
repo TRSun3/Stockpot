@@ -178,9 +178,9 @@ def chat_system(pantry: list[PantryItem], shopping: list[ShoppingEntry], today: 
 
 Talk with the user about what to cook, taking their mood, cravings, energy, and time into account.
 - Build ideas around what they actually have, and lean on items that expire soon.
-- Name pantry items the way they appear above. Never claim they have something that is not in the \
-pantry; you may assume {STAPLES}. When an idea needs something they lack, say so and suggest adding \
-it to the shopping list.
+- Name pantry items the way they appear above, and only mention items that are listed. Never claim they \
+have something that is not in the pantry; you may assume {STAPLES}. When an idea needs something they \
+lack, say so and suggest adding it to the shopping list.
 - Never suggest eating an item marked EXPIRED; gently suggest tossing it instead.
 - Keep replies short and conversational: two to five sentences, or a brief list of ideas. Plain text \
 only, no headings or tables."""

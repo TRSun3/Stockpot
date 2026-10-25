@@ -62,6 +62,11 @@ def test_protected_routes_answer_401_without_a_session(client):
         ("get", "/api/items"),
         ("post", "/api/items"),
         ("get", "/api/items/expiring"),
+        ("get", "/api/items/1"),
+        ("patch", "/api/shopping/1"),
+        ("delete", "/api/shopping/1"),
+        ("post", "/api/recipes/saved"),
+        ("delete", "/api/recipes/saved/1"),
         ("patch", "/api/items/1"),
         ("delete", "/api/items/1"),
         ("get", "/api/shopping"),
@@ -96,3 +101,16 @@ def test_passwords_are_stored_salted_and_hashed(neal, tianyue, settings):
         rows = conn.execute("SELECT password_hash, salt FROM users").fetchall()
     assert all("password1" not in value for row in rows for value in row)
     assert rows[0] != rows[1]
+
+
+def test_an_unknown_username_takes_about_as_long_as_a_wrong_password(client, neal):
+    import time
+
+    def timed(username):
+        started = time.perf_counter()
+        log_in(client, username, "wrong-one")
+        return time.perf_counter() - started
+
+    known = min(timed("neal") for _ in range(3))
+    unknown = min(timed("nobody") for _ in range(3))
+    assert unknown > known * 0.5

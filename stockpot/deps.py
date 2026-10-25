@@ -5,18 +5,14 @@ from collections.abc import Iterator
 from datetime import date
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Path, Request
 
-from stockpot import db
 from stockpot.llm import LLM
 
 
 def get_db(request: Request) -> Iterator[sqlite3.Connection]:
-    conn = db.connect(request.app.state.settings.db_path)
-    try:
+    with request.app.state.pool.connection() as conn:
         yield conn
-    finally:
-        conn.close()
 
 
 def get_today(request: Request) -> date:
@@ -29,3 +25,5 @@ def get_llm(request: Request) -> LLM:
 
 Today = Annotated[date, Depends(get_today)]
 Model = Annotated[LLM, Depends(get_llm)]
+# A row id in a URL. Anything larger than SQLite can hold is refused as invalid rather than crashing a query.
+RowId = Annotated[int, Path(ge=1, le=2**63 - 1)]

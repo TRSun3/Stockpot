@@ -76,12 +76,13 @@ COUNT_LEFT = r"\b(?:only\s+)?(\d+)\s+(?:[a-z]+\s+)?(?:left|remaining)\b"
 # What a clause says happened to an item, checked in order so "used all" wins over "used".
 # fmt: off
 ADJUSTMENTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("gone", ("used up", "used all", "use all", "finished", "ran out", "run out", "out of", "threw out",
-              "tossed", "threw away", "thrown out", "went bad", "gone bad", "spoiled", "moldy", "mouldy",
-              "ate all", "no more", "is gone", "are gone", "all gone", "got rid", "none left")),
+    ("thawed", ("thawed", "thaw", "defrost", "defrosted")),
     ("frozen", ("froze", "frozen", "freezer")),
     ("count", ()),
     ("half", ("half",)),
+    ("gone", ("used up", "used all", "use all", "finished", "ran out", "run out", "out of", "threw out",
+              "tossed", "threw away", "thrown out", "went bad", "gone bad", "spoiled", "moldy", "mouldy",
+              "ate all", "no more", "is gone", "are gone", "all gone", "got rid", "none left")),
     ("low", ("running low", "almost out", "not much", "less than", "barely any", "a little left")),
     ("add", ("bought", "picked up", "got", "grabbed", "restock", "another", "new")),
     ("more", ("more", "extra", "plenty", "found")),
@@ -92,7 +93,13 @@ ADJUSTMENTS: tuple[tuple[str, tuple[str, ...]], ...] = (
 VERBS = ("used", "ate", "threw out", "tossed", "froze", "bought", "picked up", "finished")
 
 
+# Taking food out of the freezer is thawing it, not running out of it.
+THAWING = re.compile(r"\b(?:took|take|taken|got|pulled)\b.*?\bout of the (?:freezer|deep freeze)\b")
+
+
 def adjustment(clause: str) -> str | None:
+    if THAWING.search(clause):
+        return "thawed"
     for action, phrases in ADJUSTMENTS:
         if action == "count":
             if re.search(COUNT_LEFT, clause):
@@ -100,6 +107,22 @@ def adjustment(clause: str) -> str | None:
         elif any(has_word(clause, phrase) for phrase in phrases):
             return action
     return None
+
+
+def pieces(text: str) -> list[str]:
+    """The text split into one grocery each, never inside parentheses: "Lemons (two, organic)" stays whole."""
+    found, depth, start = [], 0, 0
+    for match in re.finditer(r"[()]|" + SPLITTER.pattern, text, re.IGNORECASE):
+        token = match.group(0)
+        if token == "(":
+            depth += 1
+        elif token == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            found.append(text[start : match.start()])
+            start = match.end()
+    found.append(text[start:])
+    return found
 
 
 def has_word(text: str, word: str) -> bool:
@@ -135,9 +158,9 @@ def name_of(phrase: str) -> str:
 def leading_count(text: str) -> tuple[int, str] | None:
     """The count a phrase starts with and the rest of it: "a dozen eggs" is (12, "eggs")."""
     lowered = text.strip().lower()
-    match = re.match(r"(\d+)[\s,]+(.*)", lowered)
+    match = re.match(r"(\d+)(?:[\s,]+(.*))?$", lowered)
     if match:
-        return int(match.group(1)), match.group(2)
+        return int(match.group(1)), match.group(2) or ""
     for words in sorted(NUMBER_WORDS, key=len, reverse=True):
         if lowered.startswith(words + " "):
             return NUMBER_WORDS[words], lowered[len(words) + 1 :]
@@ -149,8 +172,20 @@ MEASURES = UNITS | {"tablespoon", "tablespoons", "teaspoon", "teaspoons", "handf
 
 def countable(have: tuple[int, str], used: tuple[int, str]) -> bool:
     """Whether a used amount can be subtracted from what is there: "3 eggs" from "12 eggs", not "2 cups"."""
-    unit = used[1].split()[0] if used[1].split() else ""
-    return unit not in MEASURES or (have[1].split() or [""])[0] == unit
+    unit = re.sub(r"[^a-z]", "", used[1].split()[0]) if used[1].split() else ""
+    return unit not in MEASURES or re.sub(r"[^a-z]", "", (have[1].split() or [""])[0]) == unit
+
+
+def counted(left: int, noun: str) -> str:
+    """How many are left: "9 eggs", or "1 egg" once only one remains."""
+    if left == 1 and noun.endswith("s") and not noun.endswith("ss"):
+        noun = noun[:-1]
+    return f"{left} {noun}"
+
+
+def is_food(name: str, word: str) -> bool:
+    """Whether an item's name is that food, as a whole word, singular or plural: "egg" isn't "Eggplant"."""
+    return re.search(rf"\b{re.escape(word)}(?:s|es)?\b", name) is not None
 
 
 def mentions(text: str, item: PantryItem) -> int:
@@ -178,6 +213,11 @@ def with_note(description: str, note: str) -> str:
     """The description with a short note about its current state, replacing any earlier note."""
     base = description.split(" — ")[0].strip()
     return f"{base} — {note}" if base else note[:1].upper() + note[1:]
+
+
+def fresh(pantry: list[PantryItem], today: date) -> list[PantryItem]:
+    """The items that haven't expired; recipes never use the others."""
+    return [item for item in pantry if (days_left(item, today) or 0) >= 0]
 
 
 def days_left(item: PantryItem, today: date) -> int | None:
@@ -309,7 +349,7 @@ LIBRARY = (
         [
             need("tortillas", "4", "tortilla"),
             need("cheddar", "a big handful, grated", "cheddar", "cheese"),
-            need("beans", "1 can, drained", "beans", "chicken"),
+            need("beans", "1 can, drained", "beans"),
             need("salsa", "to serve", "salsa", optional=True),
         ],
         [
@@ -426,13 +466,13 @@ LIBRARY = (
             "Dress with oil, lemon juice, salt, and pepper.",
             "Top with the feta and toss gently just before eating.",
         ],
-        ("salad",),
+        ("greek salad", "horiatiki"),
     ),
     template(
         "Lemon Garlic Salmon with Asparagus",
         "Tender roast salmon and asparagus on one tray, bright with lemon.",
         25,
-        "healthy celebrate dinner light",
+        "healthy celebrate dinner light oven",
         [
             need("salmon", "2 fillets"),
             need("asparagus", "a bunch", "asparagus", "broccoli", "green beans"),
@@ -537,7 +577,7 @@ LIBRARY = (
         "quick healthy light breakfast",
         [
             need("yogurt", "1 cup"),
-            need("fruit", "a handful", "berries", "strawberr", "blueberr", "banana"),
+            need("fruit", "a handful", "berries", "strawberry", "strawberries", "blueberry", "blueberries", "banana"),
             need("oats", "a handful", "oats", "granola", optional=True),
             need("honey", "a drizzle", optional=True),
         ],
@@ -610,24 +650,48 @@ MOODS = {
 
 
 MEATLESS = ("vegetarian", "vegan", "no meat", "meatless", "plant-based", "plant based")
-AVOIDING = re.compile(r"\b(?:allergic to|allergy to|no|avoid|avoids|don't eat|dont eat|can't eat|hate)\s+([a-z ]+)")
+AVOIDING = re.compile(
+    r"\b(?:allergic to|allergy to|no|avoid|avoids|don't eat|dont eat|can't eat|cannot eat|hate)\s+"
+    r"([a-z ]+?)(?=\s+(?:but|and|or|though|so)\b|[,.;!]|$)"
+)
+NO_OVEN = re.compile(r"\b(?:no|without an?|don't have an?|dont have an?)\s+oven\b")
+# Words that stand for several foods when someone says what they can't eat.
+FAMILIES = {
+    "dairy": ("milk", "cheese", "cheddar", "parmesan", "feta", "mozzarella", "butter", "cream", "yogurt"),
+    "fish": ("salmon", "fish", "cod", "tuna"),
+    "seafood": ("salmon", "fish", "cod", "tuna", "shrimp"),
+    "shellfish": ("shrimp",),
+    "gluten": ("pasta", "spaghetti", "noodle", "bread", "flour", "tortilla"),
+    "nut": ("peanut", "almond", "walnut", "cashew"),
+}
+NOT_FOODS = {"time", "oven", "stove", "meat", "more", "than", "too", "much", "spicy", "heat", "fuss", "dishes"}
+
+
+def avoided(text: str) -> set[str]:
+    """The foods someone says they can't or won't eat: "no dairy" means milk, cheese, butter, and the rest."""
+    foods = set()
+    for match in AVOIDING.finditer(text.lower()):
+        for word in match.group(1).split():
+            word = word if word.endswith("ss") else word.rstrip("s")
+            if word in UNITS or word in NOT_FOODS or len(word) < 3:
+                continue
+            foods.update(FAMILIES.get(word, (word,)))
+    return foods
+
+
+def clashes(ingredient: Ingredient, foods: set[str]) -> bool:
+    return any(food in word or food in ingredient.label for word in ingredient.words for food in foods)
 
 
 def allowed(recipe: Template, text: str) -> bool:
-    """Whether a recipe respects what the user says about their diet, like "vegetarian" or "allergic to eggs"."""
+    """Whether a recipe's must-have ingredients and equipment respect what the user says about their kitchen."""
     lowered = text.lower()
     if any(word in lowered for word in MEATLESS) and "vegetarian" not in recipe.tags:
         return False
-    avoided = {word.rstrip("s") for match in AVOIDING.finditer(lowered) for word in match.group(1).split()}
-    avoided -= UNITS | {"time", "oven", "stove", "meat", "more", "than", "and", "or", "too", "much", "spicy"}
-    return not any(
-        avoid in word or avoid in ingredient.label
-        for ingredient in recipe.ingredients
-        if not ingredient.optional
-        for word in ingredient.words
-        for avoid in avoided
-        if len(avoid) > 2
-    )
+    if "oven" in recipe.tags and NO_OVEN.search(lowered):
+        return False
+    foods = avoided(lowered)
+    return not any(clashes(ingredient, foods) for ingredient in recipe.ingredients if not ingredient.optional)
 
 
 def moods_in(text: str) -> list[str]:
@@ -662,7 +726,7 @@ class Mock(LLM):
 
     def parse_items(self, text: str, today: date) -> list[ParsedItem]:
         items = []
-        for piece in SPLITTER.split(text):
+        for piece in pieces(text):
             phrase = LEAD_INS.sub("", piece.strip(" .!?:-")).strip(" .!?:-")
             if not phrase or not re.search(r"[a-zA-Z]", phrase):
                 continue
@@ -673,18 +737,22 @@ class Mock(LLM):
             parts += [detail.group(1).strip()] if detail and detail.group(1).strip() else []
             description = ", ".join(parts)
             description = description[:1].upper() + description[1:]
-            items.append(ParsedItem(name=name, description=description, expires_on=expiry(phrase, today)))
+            items.append(ParsedItem(name=name, description=description, expires_on=expiry(food, today)))
         return items
 
-    def build(self, recipe: Template, pantry: list[PantryItem], today: date) -> tuple[Recipe, float]:
-        """The template filled in from the pantry, and how well it fits."""
-        usable = [item for item in pantry if (days_left(item, today) or 0) >= 0]
+    def build(
+        self, recipe: Template, pantry: list[PantryItem], today: date, avoid: set[str] = frozenset()
+    ) -> tuple[Recipe, float]:
+        """The template filled in from the pantry, and how well it fits. Optional extras in `avoid` are left out."""
+        usable = fresh(pantry, today)
         uses, missing, used_ids, urgency, covered = [], [], set(), 0.0, 0
         for ingredient in recipe.ingredients:
+            if ingredient.optional and clashes(ingredient, avoid):
+                continue
             matches = [
                 item
                 for item in usable
-                if item.id not in used_ids and any(has_word(item.name.lower(), word) for word in ingredient.words)
+                if item.id not in used_ids and any(is_food(item.name.lower(), word) for word in ingredient.words)
             ]
             matches.sort(key=lambda item: (days_left(item, today) is None, days_left(item, today) or 0, item.id))
             if matches:
@@ -744,7 +812,7 @@ class Mock(LLM):
         for recipe in LIBRARY:
             if not allowed(recipe, f"{preferences} {notes}"):
                 continue
-            built, score = self.build(recipe, pantry, today)
+            built, score = self.build(recipe, pantry, today, avoided(f"{preferences} {notes}"))
             if not built.uses or len(built.missing) > 2:
                 continue
             score += 0.5 * len(wanted & recipe.tags)
@@ -758,8 +826,8 @@ class Mock(LLM):
         lowered = dish.lower()
         for recipe in LIBRARY:
             names = (recipe.title.lower(), *recipe.aliases)
-            if any(name in lowered or lowered in name for name in names):
-                built, _ = self.build(recipe, pantry, today)
+            if any(re.search(rf"\b{re.escape(name)}(?:s|es)?\b", lowered) for name in names):
+                built, _ = self.build(recipe, pantry, today, avoided(notes))
                 if built.missing:
                     built.why = f"You'd need to pick up {join(built.missing)}."
                 else:
@@ -767,7 +835,9 @@ class Mock(LLM):
                 return built
         title = dish.strip().rstrip("?.!")
         title = title[:1].upper() + title[1:]
-        uses = [RecipeUse(item_id=item.id, name=item.name, amount="as needed") for item in named(dish, pantry)]
+        uses = [
+            RecipeUse(item_id=item.id, name=item.name, amount="as needed") for item in named(dish, fresh(pantry, today))
+        ]
         return Recipe(
             title=title,
             summary=f"A simple, homestyle take on {title.lower()}.",
@@ -791,9 +861,23 @@ class Mock(LLM):
         if any(word in lowered for word in ("quick", "faster", "less time", "shorter", "speed")):
             revised.time_minutes = max(5, round(recipe.time_minutes * 0.6))
             changes.append("made it faster")
-        if "spic" in lowered or "heat" in lowered or "kick" in lowered:
+        milder = re.search(
+            r"\b(?:less|not so|not too|no|milder|mild|without|tone down|too)\b.{0,15}(?:spic|heat|hot)", lowered
+        )
+        if milder or "milder" in lowered:
+            revised.missing = [name for name in revised.missing if name != "chili flakes"]
+            revised.uses = [use for use in revised.uses if "chili" not in use.name.lower()]
+            revised.steps = [step for step in revised.steps if "chili" not in step.lower()]
+            revised.title = re.sub(r"^Spicy ", "", revised.title)
+            revised.steps.append("Keep the seasoning gentle; add heat at the table if anyone wants it.")
+            changes.append("toned down the heat")
+        elif re.search(r"\b(?:spic\w*|heat|kick|hotter)\b", lowered):
             chili = next(
-                (item for item in pantry if "chili" in item.name.lower() or "jalape" in item.name.lower()),
+                (
+                    item
+                    for item in fresh(pantry, today)
+                    if "chili" in item.name.lower() or "jalape" in item.name.lower()
+                ),
                 None,
             )
             if chili:
@@ -850,7 +934,7 @@ class Mock(LLM):
                 if left <= 0:
                     ops.append(PantryOp(op="delete", item_id=item.id))
                 else:
-                    ops.append(PantryOp(op="update", item_id=item.id, description=f"{left} {have[1]}"))
+                    ops.append(PantryOp(op="update", item_id=item.id, description=counted(left, have[1])))
             elif any(note in item.description.lower() for note in ("partly used", "a little left", "almost gone")):
                 ops.append(PantryOp(op="delete", item_id=item.id))
             else:
@@ -868,7 +952,7 @@ class Mock(LLM):
             if not lowered:
                 continue
             action = adjustment(lowered) or (adjustment(f"{verb} {lowered}") if verb else None)
-            verb = next((word for word in VERBS if word in lowered), verb)
+            verb = next((word for word in VERBS if re.search(rf"\b{word}\b", lowered)), verb)
             items = named(lowered, pantry, frozenset(touched))
             for item in items:
                 touched.add(item.id)
@@ -895,6 +979,8 @@ class Mock(LLM):
                 return PantryOp(op="delete", item_id=item.id)
             case "frozen":
                 return update("frozen", expires_on=(today + timedelta(days=90)).isoformat())
+            case "thawed":
+                return update("thawed", expires_on=(today + timedelta(days=2)).isoformat())
             case "count":
                 count = re.search(COUNT_LEFT, clause).group(1)
                 have = leading_count(item.description)

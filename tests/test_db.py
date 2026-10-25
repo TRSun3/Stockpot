@@ -42,3 +42,16 @@ def test_a_failed_transaction_leaves_nothing_behind(settings):
             conn.execute("INSERT INTO users (username, password_hash, salt) VALUES ('a', 'h', 's')")
             raise RuntimeError
         assert conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
+
+
+def test_the_pool_reuses_connections_and_never_hands_one_out_mid_transaction(settings):
+    db.init(settings.db_path)
+    pool = db.Pool(settings.db_path, size=1)
+    with pool.connection() as first:
+        first.execute("BEGIN")
+        first.execute("INSERT INTO users (username, password_hash, salt) VALUES ('a', 'h', 's')")
+    with pool.connection() as again:
+        assert again is first
+        assert not again.in_transaction
+        assert again.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
+    pool.close()

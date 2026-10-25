@@ -140,3 +140,19 @@ def test_the_recipe_box_keeps_recipes_for_their_owner_only(neal, tianyue):
     assert tianyue.delete(f"/api/recipes/saved/{saved['id']}").status_code == 404
     assert neal.delete(f"/api/recipes/saved/{saved['id']}").status_code == 200
     assert neal.get("/api/recipes/saved").json() == []
+
+
+def test_a_dish_with_no_name_or_a_recipe_with_no_steps_is_refused(neal):
+    assert neal.post("/api/recipes/plan", json={"dish": "???"}).status_code == 422
+    blank = {"title": " ", "summary": "", "time_minutes": 5, "uses": [], "missing": [], "steps": [], "why": ""}
+    assert neal.post("/api/recipes/tweak", json={"recipe": blank, "feedback": "spicier"}).status_code == 422
+
+
+def test_suggestions_are_capped_at_four(app, neal):
+    class Generous(Mock):
+        def suggest_recipes(self, pantry, today, preferences="", notes=""):
+            one = Recipe(title="Toast", summary="", time_minutes=5, uses=[], missing=[], steps=["Toast it."], why="")
+            return [one] * 9
+
+    app.state.llm = Generous(delay=0)
+    assert len(neal.post("/api/recipes/suggest", json={}).json()["recipes"]) == 4

@@ -42,15 +42,23 @@ def create_user(conn: sqlite3.Connection, username: str, password: str) -> User:
     return User(cursor.lastrowid, username)
 
 
+UNKNOWN_SALT = secrets.token_hex(16)
+
+
 def verify(conn: sqlite3.Connection, username: str, password: str) -> User | None:
+    """The user these credentials belong to, or None. Unknown usernames take as long as wrong passwords."""
     row = conn.execute("SELECT id, username, password_hash, salt FROM users WHERE username = ?", (username,)).fetchone()
-    if row is None or not hmac.compare_digest(hash_password(password, row["salt"]), row["password_hash"]):
+    if row is None:
+        hash_password(password, UNKNOWN_SALT)
+        return None
+    if not hmac.compare_digest(hash_password(password, row["salt"]), row["password_hash"]):
         return None
     return User(row["id"], row["username"])
 
 
 def start_session(conn: sqlite3.Connection, user: User, response: Response) -> None:
     token = secrets.token_urlsafe(32)
+    conn.execute("DELETE FROM sessions WHERE created_at <= datetime('now', ?)", (f"-{SESSION_DAYS} days",))
     conn.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token, user.id))
     response.set_cookie(COOKIE, token, max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax", path="/")
 
