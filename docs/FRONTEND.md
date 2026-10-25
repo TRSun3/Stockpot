@@ -27,6 +27,8 @@ Sections talk through the event bus rather than calling each other: anything tha
 ## Rules
 
 - User and AI text is only ever set with `textContent` (through `el`). Nothing is assigned to `innerHTML`.
-- Every button that calls the server goes through `busy`, which disables it while the request runs, so double clicks can't submit twice.
+- Every button that calls the server is disabled while its request runs (most through `busy`), so double clicks can't submit twice. Buttons for things that only make sense once, like "I cooked this" and "Save to recipe box", stay disabled afterwards.
+- Lists reload through `latestOnly`, so a slow older response never overwrites a newer one, and re-render through `keepFocus`, so keyboard focus survives. An item being edited keeps its open form across reloads.
+- Logging out, or a session ending, clears everything the account left on the page.
 - Every color, space, and font is a custom property at the top of `css/base.css`.
 - Freshness has one class per status (`freshness-expired`, `-today`, `-soon`, `-fresh`, `-none`) so it can be restyled in one place.

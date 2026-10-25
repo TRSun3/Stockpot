@@ -2,12 +2,12 @@
 
 import { api } from "./api.js";
 import { initAuth, showAuthMessage } from "./auth.js";
-import { initChat, loadChat } from "./chat.js";
+import { initChat, loadChat, resetChat } from "./chat.js";
 import { $, show } from "./dom.js";
 import { initNotes } from "./notes.js";
-import { initPantry, loadPantry } from "./pantry.js";
-import { initRecipes, loadBox, suggestFor } from "./recipes.js";
-import { initShopping, loadShopping } from "./shopping.js";
+import { initPantry, loadPantry, resetPantry } from "./pantry.js";
+import { initRecipes, loadBox, resetRecipes, suggestFor } from "./recipes.js";
+import { initShopping, loadShopping, resetShopping } from "./shopping.js";
 import { busy } from "./ui.js";
 
 const TAB_KEY = "stockpot.tab";
@@ -53,13 +53,22 @@ async function enter(me) {
   show($("#account"), true);
   show($("#auth-view"), false);
   show($("#app-view"), true);
+  document.querySelector("[role=tab][aria-selected=true]")?.focus();
   await Promise.all([loadPantry(), loadShopping(), loadBox(), loadChat()]);
 }
 
+// Shows the login screen and clears everything the last account left on the page.
 function leave(message = "") {
   show($("#account"), false);
   show($("#app-view"), false);
   show($("#auth-view"), true);
+  resetPantry();
+  resetShopping();
+  resetRecipes();
+  resetChat();
+  for (const form of document.querySelectorAll("#app-view form")) form.reset();
+  for (const id of ["#adjust-result", "#move-result"]) $(id).replaceChildren();
+  $("#toasts").replaceChildren();
   showAuthMessage(message);
   $("#auth-form [name=username]").focus();
 }
@@ -91,8 +100,8 @@ async function start() {
 
   try {
     await enter(await api("GET", "/api/me"));
-  } catch {
-    leave();
+  } catch (error) {
+    leave(error.status === 401 ? "" : error.message);
   }
 }
 

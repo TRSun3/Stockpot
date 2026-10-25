@@ -99,7 +99,9 @@
             <h2 id="pantry-title">Pantry <span class="count" id="pantry-count"></span></h2>
             <label class="filter">Filter <input id="pantry-filter" type="search" placeholder="Search your pantry"></label>
           </div>
+          <p class="muted" id="pantry-loading">Loading your pantry…</p>
           <p class="muted" id="pantry-empty" hidden>Your pantry is empty. Add what you have above.</p>
+          <p class="muted" id="pantry-no-match" hidden>Nothing in your pantry matches that.</p>
           <ul class="items" id="pantry-list"></ul>
         </section>
       </section>
@@ -112,10 +114,11 @@
             <label>Note <input name="note" maxlength="500" placeholder="two, unwaxed"></label>
             <button type="submit" class="primary">Add</button>
           </form>
+          <p class="muted" id="shopping-loading">Loading your list…</p>
           <p class="muted" id="shopping-empty" hidden>Your shopping list is empty.</p>
           <ul class="shopping" id="shopping-list"></ul>
           <div class="row">
-            <button type="button" id="move-to-pantry" class="primary">Move checked to pantry</button>
+            <button type="button" id="move-to-pantry" class="primary" disabled>Move checked to pantry</button>
           </div>
           <div id="move-result"></div>
         </section>
@@ -138,13 +141,14 @@
           </form>
         </section>
         <p class="muted" id="recipes-empty">Ask for suggestions, or check whether you can make a dish.</p>
+        <div class="recipes" id="plan-list"></div>
         <div class="recipes" id="recipe-list"></div>
       </section>
 
       <section id="panel-box" role="tabpanel" aria-labelledby="tab-box" class="tabpanel" hidden>
         <section class="panel" aria-labelledby="box-title">
           <h2 id="box-title">Recipe box</h2>
-          <p class="muted" id="box-empty">Recipes you save show up here.</p>
+          <p class="muted" id="box-empty" hidden>Recipes you save show up here.</p>
         </section>
         <div class="recipes" id="box-list"></div>
       </section>
@@ -156,7 +160,7 @@
         <button type="button" class="link" id="chat-clear">Clear</button>
       </div>
       <ol class="messages" id="chat-messages" aria-live="polite"></ol>
-      <p class="muted" id="chat-empty">Tell me how you're feeling or what you're craving, and I'll work with what's in your kitchen.</p>
+      <p class="muted" id="chat-empty" hidden>Tell me how you're feeling or what you're craving, and I'll work with what's in your kitchen.</p>
       <form id="chat-form" class="chat-form">
         <label class="visually-hidden" for="chat-input">Message</label>
         <textarea id="chat-input" name="message" rows="2" required maxlength="2000"
@@ -170,16 +174,17 @@
   </div>
 
   <dialog id="notes-dialog" aria-labelledby="notes-title">
-    <form id="notes-form" method="dialog" class="stack">
+    <form id="notes-form" class="stack">
       <h2 id="notes-title">Kitchen notes</h2>
       <p class="muted">Anything the cook should always keep in mind: diets, allergies, equipment, who you cook for.</p>
       <label>Notes
         <textarea name="notes" rows="5" maxlength="1000"
           placeholder="Vegetarian. Allergic to peanuts. No oven, just a stovetop. Cooking for two."></textarea>
       </label>
+      <p class="error" id="notes-error" role="alert" hidden></p>
       <div class="row">
-        <button type="submit" class="primary" value="save">Save notes</button>
-        <button type="submit" value="cancel" formnovalidate>Cancel</button>
+        <button type="submit" class="primary">Save notes</button>
+        <button type="button" id="notes-cancel">Cancel</button>
       </div>
     </form>
   </dialog>

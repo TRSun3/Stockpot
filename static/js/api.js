@@ -7,6 +7,8 @@ export class ApiError extends Error {
   }
 }
 
+const OFFLINE = "Can't reach Stockpot. Is the server running?";
+
 async function failure(response) {
   let message = `Something went wrong (${response.status}).`;
   try {
@@ -19,46 +21,66 @@ async function failure(response) {
   return new ApiError(message, response.status);
 }
 
-export async function api(method, path, body) {
-  let response;
+async function send(method, path, body) {
   try {
-    response = await fetch(path, {
+    return await fetch(path, {
       method,
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError("Can't reach Stockpot. Is the server running?", 0);
+    throw new ApiError(OFFLINE, 0);
   }
+}
+
+export async function api(method, path, body) {
+  const response = await send(method, path, body);
   if (!response.ok) throw await failure(response);
   return response.json();
 }
 
 // Posts `body` and calls `onEvent` for each server-sent event the reply streams back.
+// Throws an ApiError if the connection drops or the stream ends without its closing `done` event.
 export async function stream(path, body, onEvent) {
-  let response;
-  try {
-    response = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new ApiError("Can't reach Stockpot. Is the server running?", 0);
-  }
+  const response = await send("POST", path, body);
   if (!response.ok) throw await failure(response);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let finished = false;
+
+  const handle = (block) => {
+    const data = block
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).replace(/^ /, ""))
+      .join("\n");
+    if (!data) return;
+    let event;
+    try {
+      event = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (event.type === "done") finished = true;
+    onEvent(event);
+  };
+
   for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch {
+      throw new ApiError("The connection dropped before the reply finished.", 0);
+    }
+    buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done }).replace(/\r\n?/g, "\n");
     let end;
     while ((end = buffer.indexOf("\n\n")) >= 0) {
-      const raw = buffer.slice(0, end);
+      handle(buffer.slice(0, end));
       buffer = buffer.slice(end + 2);
-      if (raw.startsWith("data: ")) onEvent(JSON.parse(raw.slice(6)));
     }
+    if (chunk.done) break;
   }
+  if (buffer.trim()) handle(buffer);
+  if (!finished) throw new ApiError("The reply was cut off before it finished.", 0);
 }

@@ -25,6 +25,15 @@ ROOT = Path(__file__).resolve().parents[2]
 SHOTS = ROOT / "screenshots"
 
 
+def stop(process: subprocess.Popen) -> None:
+    """Stops the server and anything it started; on Windows the venv's python.exe is a launcher with a child."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, check=False)
+    else:
+        process.terminate()
+    process.wait(timeout=10)
+
+
 @pytest.fixture(scope="module")
 def server(tmp_path_factory):
     path = tmp_path_factory.mktemp("browser") / "stockpot.db"
@@ -50,8 +59,7 @@ def server(tmp_path_factory):
         except OSError:
             time.sleep(0.1)
     yield url
-    process.terminate()
-    process.wait(timeout=10)
+    stop(process)
 
 
 @pytest.fixture(scope="module")
@@ -125,7 +133,7 @@ def test_the_pantry_flows_from_login_to_logout(window):
     expect(page.locator("#pantry-list .item-name", has_text="Spinach")).to_have_count(2)
 
     milk = page.locator("#pantry-list .item", has_text="Milk")
-    milk.get_by_role("button", name="Edit").click()
+    milk.locator("button", has_text="Edit").click()
     page.locator(".edit-form [name=description]").fill("a full gallon, just opened")
     page.locator(".edit-form").get_by_role("button", name="Save").click()
     page.locator("#pantry-list .item", has_text="a full gallon, just opened").wait_for()
@@ -135,7 +143,7 @@ def test_the_pantry_flows_from_login_to_logout(window):
     page.locator("#adjust-result", has_text="Updated milk, removed avocados").wait_for()
     expect(page.locator("#pantry-list .item-name", has_text="Avocados")).to_have_count(0)
 
-    page.locator("#pantry-list .item", has_text="Sourdough").get_by_role("button", name="Used up").click()
+    page.locator("#pantry-list .item", has_text="Sourdough").locator("button", has_text="Used up").click()
     page.locator(".toast", has_text="Removed sourdough").get_by_role("button", name="Add to shopping list").click()
     page.locator(".toast", has_text="Added sourdough to your shopping list").wait_for()
     page.get_by_label("Filter").fill("jasmine")
@@ -183,23 +191,23 @@ def test_recipes_can_be_suggested_checked_tweaked_saved_and_cooked(window):
     shot(page, "05-recipes")
 
     page.get_by_label("Can I make…").fill("carbonara")
-    page.get_by_role("button", name="Check my kitchen").click()
-    carbonara = page.locator("#recipe-list .recipe", has_text="Spaghetti Carbonara")
+    page.locator("#plan-form button").click()
+    carbonara = page.locator("#plan-list .recipe", has_text="Spaghetti Carbonara")
     carbonara.wait_for()
     assert "bacon" in carbonara.locator(".recipe-ingredients").inner_text()
-    carbonara.get_by_role("button", name="Add missing to shopping list").click()
+    carbonara.locator("button", has_text="Add missing to shopping list").click()
     page.locator(".toast", has_text="on your list").or_(page.locator(".toast", has_text="Added")).first.wait_for()
 
     carbonara.get_by_label("Tweak it").fill("make it spicier")
-    carbonara.get_by_role("button", name="Tweak").click()
-    spicy = page.locator("#recipe-list .recipe", has_text="Spicy Spaghetti Carbonara")
+    carbonara.locator("button", has_text="Tweak").click()
+    spicy = page.locator("#plan-list .recipe", has_text="Spicy Spaghetti Carbonara")
     spicy.wait_for()
-    spicy.get_by_role("button", name="Save to recipe box").click()
+    spicy.locator("button", has_text="Save to recipe box").click()
     page.locator(".toast", has_text="Saved Spicy Spaghetti Carbonara").wait_for()
 
     first = cards.nth(1)
     used = first.locator(".recipe-ingredients li strong").all_text_contents()
-    first.get_by_role("button", name="I cooked this").click()
+    first.locator("button", has_text="I cooked this").click()
     first.locator(".changes").wait_for()
     assert first.locator(".changes").inner_text().startswith(("Updated", "Removed"))
     shot(page, "06-cooked")
@@ -212,7 +220,7 @@ def test_recipes_can_be_suggested_checked_tweaked_saved_and_cooked(window):
     page.get_by_role("tab", name="Recipe box").click()
     saved = page.locator("#box-list .recipe", has_text="Spicy Spaghetti Carbonara")
     saved.wait_for()
-    saved.get_by_role("button", name="Check my kitchen").click()
+    saved.locator("button", has_text="Check my kitchen").click()
     page.locator("#box-list .recipe", has_text="Spaghetti Carbonara").wait_for()
     shot(page, "07-recipe-box")
 

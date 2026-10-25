@@ -3,7 +3,10 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { minutes } from "./format.js";
-import { busy, changeSummary, emit, on, onSubmit, toast } from "./ui.js";
+import { busy, changeSummary, emit, latestOnly, on, onSubmit, toast } from "./ui.js";
+
+const PREFERENCES_LIMIT = 300;
+const fetchBox = latestOnly(() => api("GET", "/api/recipes/saved"));
 
 export function initRecipes() {
   onSubmit(
@@ -22,7 +25,7 @@ export function initRecipes() {
         }
       } catch (error) {
         list.replaceChildren();
-        show($("#recipes-empty"), true);
+        show($("#recipes-empty"), !$("#plan-list").children.length);
         throw error;
       }
     },
@@ -34,7 +37,7 @@ export function initRecipes() {
     async ({ dish }) => {
       const { recipe } = await api("POST", "/api/recipes/plan", { dish });
       show($("#recipes-empty"), false);
-      $("#recipe-list").prepend(recipeCard(recipe));
+      $("#plan-list").replaceChildren(recipeCard(recipe));
       $("#plan-form").reset();
     },
     "Checking…"
@@ -43,15 +46,18 @@ export function initRecipes() {
   on("box", loadBox);
 }
 
+// Asks for suggestions shaped by `preferences`, unless a suggestion is already on its way.
 export function suggestFor(preferences) {
   const form = $("#suggest-form");
-  form.elements.preferences.value = preferences;
+  if (form.querySelector("[type=submit]").disabled) return;
+  form.elements.preferences.value = preferences.slice(0, PREFERENCES_LIMIT);
   form.requestSubmit();
 }
 
 export async function loadBox() {
   try {
-    const saved = await api("GET", "/api/recipes/saved");
+    const saved = await fetchBox();
+    if (saved === undefined) return;
     $("#box-list").replaceChildren(...saved.map((entry) => recipeCard(entry.recipe, { savedId: entry.id })));
     show($("#box-empty"), saved.length === 0);
   } catch (error) {
@@ -59,11 +65,16 @@ export async function loadBox() {
   }
 }
 
+export function resetRecipes() {
+  for (const id of ["#recipe-list", "#plan-list", "#box-list"]) $(id).replaceChildren();
+  show($("#recipes-empty"), true);
+}
+
 function recipeCard(recipe, { savedId } = {}) {
   const result = el("div", { class: "card-result" });
   const card = el(
     "article",
-    { class: "recipe card" },
+    { class: "recipe card", "aria-label": recipe.title },
     el(
       "header",
       { class: "recipe-head" },
@@ -113,7 +124,7 @@ function recipeCard(recipe, { savedId } = {}) {
       )
     ),
     actions(recipe, savedId, () => card, result),
-    tweakForm(recipe, () => card),
+    tweakForm(recipe, savedId, () => card),
     result
   );
   return card;
@@ -126,6 +137,7 @@ function actions(recipe, savedId, card, result) {
       type: "button",
       class: "primary",
       text: "I cooked this",
+      "aria-label": `I cooked ${recipe.title}`,
       onclick: (event) =>
         busy(
           event.currentTarget,
@@ -134,7 +146,8 @@ function actions(recipe, savedId, card, result) {
             result.replaceChildren(changeSummary(changes));
             emit("pantry");
           },
-          "Updating pantry…"
+          "Updating pantry…",
+          "Cooked"
         ),
     })
   );
@@ -143,20 +156,26 @@ function actions(recipe, savedId, card, result) {
       el("button", {
         type: "button",
         text: "Add missing to shopping list",
+        "aria-label": `Add what ${recipe.title} is missing to the shopping list`,
         onclick: (event) =>
-          busy(event.currentTarget, async () => {
-            const { added, skipped } = await api("POST", "/api/recipes/missing-to-shopping", {
-              names: recipe.missing,
-              recipe_title: recipe.title,
-            });
-            const names = added.map((entry) => entry.name.toLowerCase());
-            toast(
-              names.length
-                ? `Added ${names.join(", ")} to your shopping list.`
-                : `${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} already on your list.`
-            );
-            emit("shopping");
-          }),
+          busy(
+            event.currentTarget,
+            async () => {
+              const { added, skipped } = await api("POST", "/api/recipes/missing-to-shopping", {
+                names: recipe.missing,
+                recipe_title: recipe.title.slice(0, PREFERENCES_LIMIT),
+              });
+              const names = added.map((entry) => entry.name.toLowerCase());
+              toast(
+                names.length
+                  ? `Added ${names.join(", ")} to your shopping list.`
+                  : `${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} already on your list.`
+              );
+              emit("shopping");
+            },
+            "Adding…",
+            "On your list"
+          ),
       })
     );
   }
@@ -165,12 +184,18 @@ function actions(recipe, savedId, card, result) {
       el("button", {
         type: "button",
         text: "Save to recipe box",
+        "aria-label": `Save ${recipe.title} to the recipe box`,
         onclick: (event) =>
-          busy(event.currentTarget, async () => {
-            await api("POST", "/api/recipes/saved", { recipe });
-            toast(`Saved ${recipe.title} to your recipe box.`);
-            emit("box");
-          }),
+          busy(
+            event.currentTarget,
+            async () => {
+              await api("POST", "/api/recipes/saved", { recipe });
+              toast(`Saved ${recipe.title} to your recipe box.`);
+              emit("box");
+            },
+            "Saving…",
+            "Saved"
+          ),
       })
     );
   } else {
@@ -178,11 +203,12 @@ function actions(recipe, savedId, card, result) {
       el("button", {
         type: "button",
         text: "Check my kitchen",
+        "aria-label": `Check my kitchen for ${recipe.title}`,
         onclick: (event) =>
           busy(
             event.currentTarget,
             async () => {
-              const { recipe: fresh } = await api("POST", "/api/recipes/plan", { dish: recipe.title });
+              const { recipe: fresh } = await api("POST", "/api/recipes/plan", { dish: recipe.title.slice(0, 120) });
               card().replaceWith(recipeCard(fresh, { savedId }));
             },
             "Checking…"
@@ -191,6 +217,7 @@ function actions(recipe, savedId, card, result) {
       el("button", {
         type: "button",
         text: "Remove from box",
+        "aria-label": `Remove ${recipe.title} from the recipe box`,
         onclick: (event) =>
           busy(event.currentTarget, async () => {
             await api("DELETE", `/api/recipes/saved/${savedId}`);
@@ -202,7 +229,8 @@ function actions(recipe, savedId, card, result) {
   return row;
 }
 
-function tweakForm(recipe, card) {
+// A tweak makes a new recipe. In the recipe box it appears in place of the saved one, ready to be saved too.
+function tweakForm(recipe, savedId, card) {
   const form = el(
     "form",
     { class: "row tweak" },
@@ -212,13 +240,18 @@ function tweakForm(recipe, card) {
       "Tweak it ",
       el("input", { name: "feedback", required: true, maxLength: 300, placeholder: "make it vegetarian, no oven…" })
     ),
-    el("button", { type: "submit", text: "Tweak" })
+    el("button", { type: "submit", text: "Tweak", "aria-label": `Tweak ${recipe.title}` })
   );
   onSubmit(
     form,
     async ({ feedback }) => {
       const { recipe: tweaked } = await api("POST", "/api/recipes/tweak", { recipe, feedback });
-      card().replaceWith(recipeCard(tweaked));
+      const fresh = recipeCard(tweaked);
+      if (savedId !== undefined) {
+        fresh.prepend(el("p", { class: "muted", text: "A tweaked version, not saved yet." }));
+      }
+      card().replaceWith(fresh);
+      fresh.querySelector("[name=feedback]").focus();
     },
     "Tweaking…"
   );

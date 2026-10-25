@@ -3,9 +3,14 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { freshnessLabel } from "./format.js";
-import { busy, changeSummary, emit, on, onSubmit, toast } from "./ui.js";
+import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js";
 
 let items = [];
+let loaded = false;
+// The item being edited and its open form, kept across re-renders so a reload never throws away typing.
+let editing = null;
+
+const fetchItems = latestOnly(() => api("GET", "/api/items"));
 
 export function initPantry() {
   onSubmit(
@@ -41,35 +46,51 @@ export function initPantry() {
     "Updating…"
   );
 
-  $("#pantry-filter").addEventListener("input", render);
+  $("#pantry-filter").addEventListener("input", () => keepFocus(render));
   on("pantry", loadPantry);
 }
 
 export async function loadPantry() {
   try {
-    items = await api("GET", "/api/items");
-    render();
+    const fresh = await fetchItems();
+    if (fresh === undefined) return;
+    items = fresh;
+    loaded = true;
+    if (editing && !items.some((item) => item.id === editing.id)) editing = null;
+    keepFocus(render);
   } catch (error) {
     toast(error.message, "error");
   }
 }
 
+export function resetPantry() {
+  items = [];
+  loaded = false;
+  editing = null;
+  render();
+}
+
 function render() {
   const soon = items.filter((item) => item.days_left !== null && item.days_left <= 3);
-  $("#soon-list").replaceChildren(...soon.map((item) => itemRow(item, { editable: false })));
-  show($("#soon-empty"), soon.length === 0);
+  $("#soon-list").replaceChildren(...soon.map((item) => itemRow(item, "soon")));
+  show($("#soon-empty"), loaded && soon.length === 0);
 
   const query = $("#pantry-filter").value.trim().toLowerCase();
   const shown = query
     ? items.filter((item) => `${item.name} ${item.description}`.toLowerCase().includes(query))
     : items;
-  $("#pantry-list").replaceChildren(...shown.map((item) => itemRow(item, { editable: true })));
+  $("#pantry-list").replaceChildren(
+    ...shown.map((item) => (editing && editing.id === item.id ? editing.row : itemRow(item, "all")))
+  );
   $("#pantry-count").textContent = items.length ? `(${items.length})` : "";
-  show($("#pantry-empty"), items.length === 0);
+  show($("#pantry-loading"), !loaded);
+  show($("#pantry-empty"), loaded && items.length === 0);
+  show($("#pantry-no-match"), loaded && items.length > 0 && shown.length === 0);
 }
 
-function itemRow(item, { editable }) {
-  const row = el(
+function itemRow(item, list) {
+  const discardLabel = item.status === "expired" ? "Toss" : "Used up";
+  return el(
     "li",
     { class: `item status-${item.status}` },
     el(
@@ -82,34 +103,38 @@ function itemRow(item, { editable }) {
     el(
       "div",
       { class: "item-actions" },
-      editable ? el("button", { type: "button", text: "Edit", onclick: () => row.replaceWith(editRow(item)) }) : null,
+      list === "all"
+        ? el("button", {
+            type: "button",
+            text: "Edit",
+            "aria-label": `Edit ${item.name}`,
+            "data-key": `item-${item.id}-edit`,
+            onclick: () => startEditing(item),
+          })
+        : null,
       el("button", {
         type: "button",
-        text: item.status === "expired" ? "Toss" : "Used up",
+        text: discardLabel,
+        "aria-label": `${discardLabel}: ${item.name}`,
+        "data-key": `item-${item.id}-discard-${list}`,
         onclick: (event) => discard(item, event.currentTarget),
       })
     )
   );
-  return row;
 }
 
-function editRow(item) {
+function startEditing(item) {
   const form = el(
     "form",
-    { class: "grid-form edit-form" },
+    { class: "grid-form edit-form", "aria-label": `Edit ${item.name}` },
     el("label", {}, "Name ", el("input", { name: "name", value: item.name, required: true, maxLength: 80 })),
-    el(
-      "label",
-      {},
-      "Details ",
-      el("input", { name: "description", value: item.description, maxLength: 500 })
-    ),
+    el("label", {}, "Details ", el("input", { name: "description", value: item.description, maxLength: 500 })),
     el("label", {}, "Expires ", el("input", { name: "expires_on", type: "date", value: item.expires_on || "" })),
     el(
       "div",
       { class: "row" },
       el("button", { type: "submit", class: "primary", text: "Save" }),
-      el("button", { type: "button", text: "Cancel", onclick: render })
+      el("button", { type: "button", text: "Cancel", onclick: () => stopEditing(item) })
     )
   );
   onSubmit(form, async (data) => {
@@ -118,11 +143,21 @@ function editRow(item) {
       description: data.description,
       expires_on: data.expires_on || null,
     });
+    stopEditing(item);
     emit("pantry");
   });
-  const row = el("li", { class: "item editing" }, form);
-  queueMicrotask(() => form.querySelector("input").focus());
-  return row;
+  form.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") stopEditing(item);
+  });
+  editing = { id: item.id, row: el("li", { class: "item editing" }, form) };
+  render();
+  form.querySelector("input").focus();
+}
+
+function stopEditing(item) {
+  editing = null;
+  render();
+  document.querySelector(`[data-key="item-${item.id}-edit"]`)?.focus();
 }
 
 async function discard(item, button) {

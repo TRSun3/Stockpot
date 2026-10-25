@@ -5,6 +5,7 @@ import { el, $, show } from "./dom.js";
 import { busy, onSubmit, toast } from "./ui.js";
 
 let lastAsked = "";
+let streaming = false;
 
 export function initChat({ onRecipes }) {
   const form = $("#chat-form");
@@ -20,7 +21,7 @@ export function initChat({ onRecipes }) {
   });
 
   $("#chat-clear").addEventListener("click", (event) => {
-    if (!confirm("Clear the whole conversation?")) return;
+    if (streaming || !confirm("Clear the whole conversation?")) return;
     busy(event.currentTarget, async () => {
       await api("DELETE", "/api/chat");
       render([]);
@@ -32,15 +33,21 @@ export function initChat({ onRecipes }) {
 
 export async function loadChat() {
   try {
-    const history = await api("GET", "/api/chat");
-    render(history);
+    render(await api("GET", "/api/chat"));
   } catch (error) {
     toast(error.message, "error");
   }
 }
 
+export function resetChat() {
+  render([]);
+}
+
 function render(history) {
-  $("#chat-messages").replaceChildren(...history.map((message) => bubble(message.role, message.content)));
+  const list = $("#chat-messages");
+  list.setAttribute("aria-busy", "true");
+  list.replaceChildren(...history.map((message) => bubble(message.role, message.content)));
+  list.removeAttribute("aria-busy");
   show($("#chat-empty"), history.length === 0);
   const asked = history.filter((message) => message.role === "user").at(-1);
   lastAsked = asked ? asked.content : "";
@@ -62,21 +69,31 @@ function scrollToEnd() {
   list.scrollTop = list.scrollHeight;
 }
 
+function setStreaming(active) {
+  streaming = active;
+  $("#chat-clear").disabled = active;
+  const list = $("#chat-messages");
+  if (active) list.setAttribute("aria-busy", "true");
+  else list.removeAttribute("aria-busy");
+}
+
 async function send(message) {
-  if (!message) return;
+  if (!message || streaming) return;
   const list = $("#chat-messages");
   const input = $("#chat-input");
-  show($("#chat-empty"), false);
-  list.append(bubble("user", message));
+  const asked = bubble("user", message);
   const reply = bubble("assistant", "");
-  reply.classList.add("streaming");
   const text = reply.querySelector("p");
+  show($("#chat-empty"), false);
+  reply.classList.add("streaming");
   text.textContent = "…";
-  list.append(reply);
+  list.append(asked, reply);
   input.value = "";
   input.disabled = true;
+  setStreaming(true);
   scrollToEnd();
   let received = "";
+  let failed = "";
   try {
     await stream("/api/chat", { message }, (event) => {
       if (event.type === "text") {
@@ -84,19 +101,29 @@ async function send(message) {
         text.textContent = received;
         scrollToEnd();
       } else if (event.type === "error") {
-        reply.classList.add("message-error");
-        text.textContent = received ? `${received} … ${event.error}` : event.error;
+        failed = event.error;
       }
     });
+  } catch (error) {
+    failed = error.message;
+  }
+  if (failed && !received) {
+    // Nothing was said, so the server forgot the question too; put it back to send again.
+    asked.remove();
+    reply.classList.add("message-error");
+    text.textContent = failed;
+    input.value = message;
+  } else if (failed) {
+    reply.classList.add("message-error");
+    text.textContent = `${received} … ${failed}`;
+  }
+  if (received) {
     lastAsked = message;
     show($("#chat-to-recipes"), true);
-  } catch (error) {
-    reply.classList.add("message-error");
-    text.textContent = error.message;
-    input.value = message;
-  } finally {
-    reply.classList.remove("streaming");
-    input.disabled = false;
-    input.focus();
   }
+  reply.classList.remove("streaming");
+  input.disabled = false;
+  setStreaming(false);
+  const focus = document.activeElement;
+  if (!focus || focus === document.body || focus.closest(".chat")) input.focus();
 }

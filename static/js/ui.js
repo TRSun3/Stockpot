@@ -1,10 +1,16 @@
-// Shared behavior: toasts, busy states that block double submits, and a tiny event bus between sections.
+// Shared behavior: toasts, busy states that block double submits, keeping focus and only the latest response
+// across re-renders, and a tiny event bus between sections.
 
 import { el, $ } from "./dom.js";
 
 // A short message in the corner. `action` adds a button, like "Add to shopping list" after using something up.
+// The toast stays while the pointer or keyboard focus is on it.
 export function toast(message, kind = "info", action) {
-  const note = el("div", { class: `toast toast-${kind}` }, el("span", { text: message }));
+  const note = el(
+    "div",
+    { class: `toast toast-${kind}`, role: kind === "error" ? "alert" : null },
+    el("span", { text: message })
+  );
   if (action) {
     note.append(
       el("button", {
@@ -15,26 +21,44 @@ export function toast(message, kind = "info", action) {
       })
     );
   }
+  const lifetime = action ? 10000 : kind === "error" ? 7000 : 4000;
+  let timer = setTimeout(() => note.remove(), lifetime);
+  const hold = () => clearTimeout(timer);
+  const release = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => note.remove(), 3000);
+  };
+  note.addEventListener("mouseenter", hold);
+  note.addEventListener("focusin", hold);
+  note.addEventListener("mouseleave", release);
+  note.addEventListener("focusout", release);
   $("#toasts").append(note);
-  setTimeout(() => note.remove(), action ? 9000 : kind === "error" ? 7000 : 4000);
 }
 
 // Runs `task` with the button disabled and marked busy, so a second click can't submit twice.
-export async function busy(button, task, label = "Working…") {
+// With `done`, the button stays disabled afterwards showing that text, for actions that only make sense once.
+export async function busy(button, task, label = "Working…", done) {
   if (button.disabled) return undefined;
   const original = button.textContent;
+  let succeeded = false;
   button.disabled = true;
   button.setAttribute("aria-busy", "true");
   button.textContent = label;
   try {
-    return await task();
+    const result = await task();
+    succeeded = true;
+    return result;
   } catch (error) {
     toast(error.message || "Something went wrong.", "error");
     return undefined;
   } finally {
-    button.disabled = false;
     button.removeAttribute("aria-busy");
-    button.textContent = original;
+    if (succeeded && done) {
+      button.textContent = done;
+    } else {
+      button.disabled = false;
+      button.textContent = original;
+    }
   }
 }
 
@@ -46,6 +70,23 @@ export function onSubmit(form, task, label) {
     const data = Object.fromEntries(new FormData(form));
     busy(button, () => task(data, button), label);
   });
+}
+
+// Wraps a loader so only the most recent call's result counts; older responses resolve to undefined.
+export function latestOnly(load) {
+  let ticket = 0;
+  return async (...args) => {
+    const mine = ++ticket;
+    const result = await load(...args);
+    return mine === ticket ? result : undefined;
+  };
+}
+
+// Re-renders while keeping keyboard focus on the control with the same `data-key`, if it still exists.
+export function keepFocus(render) {
+  const key = document.activeElement?.dataset?.key;
+  render();
+  if (key) document.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus();
 }
 
 const bus = new EventTarget();
@@ -82,7 +123,8 @@ export function changeSummary(result) {
     );
   }
   if (result.rejected.length) {
-    box.append(el("p", { class: "muted", text: `${result.rejected.length} suggested change(s) were skipped as unsafe.` }));
+    const count = result.rejected.length;
+    box.append(el("p", { class: "muted", text: `${count} suggested change${count === 1 ? " was" : "s were"} skipped as unsafe.` }));
   }
   return box;
 }

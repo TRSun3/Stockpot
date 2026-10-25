@@ -3,9 +3,12 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { freshnessLabel } from "./format.js";
-import { busy, emit, on, onSubmit, toast } from "./ui.js";
+import { busy, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js";
 
 let entries = [];
+let loaded = false;
+
+const fetchEntries = latestOnly(() => api("GET", "/api/shopping"));
 
 export function initShopping() {
   onSubmit($("#shopping-form"), async (data) => {
@@ -15,8 +18,8 @@ export function initShopping() {
     emit("shopping");
   });
 
-  $("#move-to-pantry").addEventListener("click", (event) =>
-    busy(
+  $("#move-to-pantry").addEventListener("click", async (event) => {
+    await busy(
       event.currentTarget,
       async () => {
         const { moved } = await api("POST", "/api/shopping/move-to-pantry");
@@ -32,29 +35,66 @@ export function initShopping() {
             )
           )
         );
+        entries = entries.filter((entry) => !entry.checked);
+        render();
         emit("shopping");
         emit("pantry");
       },
       "Moving…"
-    )
-  );
+    );
+    syncMoveButton();
+  });
 
   on("shopping", loadShopping);
 }
 
 export async function loadShopping() {
   try {
-    entries = await api("GET", "/api/shopping");
-    render();
+    const fresh = await fetchEntries();
+    if (fresh === undefined) return;
+    entries = fresh;
+    loaded = true;
+    keepFocus(render);
   } catch (error) {
     toast(error.message, "error");
   }
 }
 
+export function resetShopping() {
+  entries = [];
+  loaded = false;
+  render();
+}
+
+function sorted() {
+  return [...entries].sort((a, b) => Number(a.checked) - Number(b.checked) || a.id - b.id);
+}
+
+function syncMoveButton() {
+  const button = $("#move-to-pantry");
+  if (!button.hasAttribute("aria-busy")) button.disabled = !entries.some((entry) => entry.checked);
+}
+
 function render() {
-  $("#shopping-list").replaceChildren(...entries.map(entryRow));
-  show($("#shopping-empty"), entries.length === 0);
-  $("#move-to-pantry").disabled = !entries.some((entry) => entry.checked);
+  $("#shopping-list").replaceChildren(...sorted().map(entryRow));
+  show($("#shopping-loading"), !loaded);
+  show($("#shopping-empty"), loaded && entries.length === 0);
+  syncMoveButton();
+}
+
+// Checking off updates the list in place, so ticking several boxes quickly never waits on or races a reload.
+async function toggle(entry, box) {
+  const checked = box.checked;
+  entry.checked = checked;
+  keepFocus(render);
+  try {
+    const saved = await api("PATCH", `/api/shopping/${entry.id}`, { checked });
+    Object.assign(entry, saved);
+  } catch (error) {
+    entry.checked = !checked;
+    toast(error.message, "error");
+  }
+  keepFocus(render);
 }
 
 function entryRow(entry) {
@@ -62,17 +102,8 @@ function entryRow(entry) {
     type: "checkbox",
     checked: entry.checked,
     "aria-label": `Bought ${entry.name}`,
-    onchange: async () => {
-      box.disabled = true;
-      try {
-        await api("PATCH", `/api/shopping/${entry.id}`, { checked: box.checked });
-        emit("shopping");
-      } catch (error) {
-        box.checked = !box.checked;
-        box.disabled = false;
-        toast(error.message, "error");
-      }
-    },
+    "data-key": `entry-${entry.id}-check`,
+    onchange: () => toggle(entry, box),
   });
   return el(
     "li",
@@ -91,7 +122,9 @@ function entryRow(entry) {
       onclick: (event) =>
         busy(event.currentTarget, async () => {
           await api("DELETE", `/api/shopping/${entry.id}`);
-          emit("shopping");
+          entries = entries.filter((other) => other.id !== entry.id);
+          render();
+          $("#shopping-form [name=name]").focus();
         }),
     })
   );
