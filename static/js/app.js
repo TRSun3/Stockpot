@@ -11,6 +11,41 @@ import { initShopping, loadShopping, resetShopping } from "./shopping.js";
 import { busy } from "./ui.js";
 
 const TAB_KEY = "stockpot.tab";
+const THEME_KEY = "stockpot.theme";
+
+function currentTheme() {
+  return document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+}
+
+function labelThemeToggle() {
+  const next = currentTheme() === "dark" ? "light" : "dark";
+  $("#theme-toggle").setAttribute("aria-label", `Switch to ${next} mode`);
+}
+
+function initTheme() {
+  labelThemeToggle();
+  $("#theme-toggle").addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Without storage the choice lasts until the page reloads.
+    }
+    labelThemeToggle();
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", labelThemeToggle);
+}
+
+// Enter submits the plain-words boxes, like the chat; Shift+Enter still adds a line.
+function enterSubmits(form) {
+  form.querySelector("textarea").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+}
 
 function selectTab(tab, { focus = false } = {}) {
   for (const other of document.querySelectorAll("[role=tab]")) {
@@ -49,6 +84,7 @@ function initTabs() {
 
 async function enter(me) {
   $("#username").textContent = me.username;
+  $("#avatar").textContent = me.username.slice(0, 1);
   show($("#mock-badge"), me.llm === "mock");
   show($("#account"), true);
   show($("#auth-view"), false);
@@ -74,7 +110,10 @@ function leave(message = "") {
 }
 
 async function start() {
+  initTheme();
   initTabs();
+  enterSubmits($("#parse-form"));
+  enterSubmits($("#adjust-form"));
   initAuth({ onEnter: enter });
   initPantry();
   initShopping();

@@ -7,6 +7,8 @@ import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, toast }
 
 let items = [];
 let loaded = false;
+// Ids already on screen, so only newly added items settle in with an animation.
+let seen = new Set();
 // The item being edited and its open form, kept across re-renders so a reload never throws away typing.
 let editing = null;
 
@@ -54,7 +56,9 @@ export async function loadPantry() {
   try {
     const fresh = await fetchItems();
     if (fresh === undefined) return;
-    items = fresh;
+    const before = seen;
+    items = fresh.map((item) => ({ ...item, isNew: loaded && !before.has(item.id) }));
+    seen = new Set(items.map((item) => item.id));
     loaded = true;
     if (editing && !items.some((item) => item.id === editing.id)) editing = null;
     keepFocus(render);
@@ -66,6 +70,7 @@ export async function loadPantry() {
 export function resetPantry() {
   items = [];
   loaded = false;
+  seen = new Set();
   editing = null;
   render();
 }
@@ -86,13 +91,14 @@ function render() {
   show($("#pantry-loading"), !loaded);
   show($("#pantry-empty"), loaded && items.length === 0);
   show($("#pantry-no-match"), loaded && items.length > 0 && shown.length === 0);
+  for (const item of items) item.isNew = false;
 }
 
 function itemRow(item, list) {
   const discardLabel = item.status === "expired" ? "Toss" : "Used up";
   return el(
     "li",
-    { class: `item status-${item.status}` },
+    { class: `item status-${item.status}${item.isNew ? " is-new" : ""}` },
     el(
       "div",
       { class: "item-main" },

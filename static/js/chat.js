@@ -83,6 +83,8 @@ async function send(message) {
   const input = $("#chat-input");
   const asked = bubble("user", message);
   const reply = bubble("assistant", "");
+  asked.classList.add("is-new");
+  reply.classList.add("is-new");
   const text = reply.querySelector("p");
   show($("#chat-empty"), false);
   reply.classList.add("streaming");

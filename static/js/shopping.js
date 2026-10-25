@@ -7,6 +7,7 @@ import { busy, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js"
 
 let entries = [];
 let loaded = false;
+let seen = new Set();
 
 const fetchEntries = latestOnly(() => api("GET", "/api/shopping"));
 
@@ -52,7 +53,9 @@ export async function loadShopping() {
   try {
     const fresh = await fetchEntries();
     if (fresh === undefined) return;
-    entries = fresh;
+    const before = seen;
+    entries = fresh.map((entry) => ({ ...entry, isNew: loaded && !before.has(entry.id) }));
+    seen = new Set(entries.map((entry) => entry.id));
     loaded = true;
     keepFocus(render);
   } catch (error) {
@@ -63,6 +66,7 @@ export async function loadShopping() {
 export function resetShopping() {
   entries = [];
   loaded = false;
+  seen = new Set();
   render();
 }
 
@@ -80,6 +84,7 @@ function render() {
   show($("#shopping-loading"), !loaded);
   show($("#shopping-empty"), loaded && entries.length === 0);
   syncMoveButton();
+  for (const entry of entries) entry.isNew = false;
 }
 
 // Checking off updates the list in place, so ticking several boxes quickly never waits on or races a reload.
@@ -107,7 +112,7 @@ function entryRow(entry) {
   });
   return el(
     "li",
-    { class: entry.checked ? "entry checked" : "entry" },
+    { class: `entry${entry.checked ? " checked" : ""}${entry.isNew ? " is-new" : ""}` },
     el(
       "label",
       { class: "entry-main" },

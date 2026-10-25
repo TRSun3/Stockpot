@@ -275,3 +275,34 @@ def test_text_from_users_and_the_ai_is_shown_as_text_never_run_as_html(window):
     assert page.locator("#pantry-list img").count() == 0
     assert page.locator("#pantry-list b").count() == 0
     assert page.title() == "Stockpot"
+
+
+def test_the_kitchen_fits_a_phone_width_window_without_sideways_scrolling(browser, server):
+    context = browser.new_context(base_url=server, viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    log_in(page, "tianyue")
+    for tab in ("Kitchen", "Shopping list", "Recipes", "Recipe box"):
+        page.get_by_role("tab", name=tab).click()
+        assert page.evaluate("document.documentElement.scrollWidth") <= 390, tab
+    page.get_by_role("tab", name="Kitchen").click()
+    shot(page, "10-phone")
+    context.close()
+
+
+def test_dark_mode_follows_the_system_and_the_toggle_switches_it(browser, server):
+    context = browser.new_context(base_url=server, viewport={"width": 1440, "height": 900}, color_scheme="dark")
+    page = context.new_page()
+    log_in(page, "neal")
+    background = "getComputedStyle(document.body).backgroundColor"
+    dark = page.evaluate(background)
+    shot(page, "11-dark-kitchen")
+    page.get_by_role("tab", name="Recipes").click()
+    page.get_by_role("button", name="Suggest recipes").click()
+    page.locator("#recipe-list .recipe").first.wait_for()
+    shot(page, "12-dark-recipes")
+    page.get_by_role("button", name="Switch to light mode").click()
+    assert page.evaluate(background) != dark
+    page.reload()
+    page.locator("#app-view").wait_for()
+    assert page.evaluate("document.documentElement.dataset.theme") == "light"
+    context.close()

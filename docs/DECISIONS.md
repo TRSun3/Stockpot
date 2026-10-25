@@ -31,3 +31,9 @@ Choices made where the brief was silent or where the project deviates from it, a
 
 - **Docs live in `docs/`**, including this file and `VERIFICATION.md`, rather than at the root as the brief sketches. This follows the conventions of the owner's other repositories. Only `README.md` and `AGENTS.md` sit at the root.
 - **The brief itself is not tracked.** `STOCKPOT_BRIEF.md` is in `.gitignore`. The owner keeps it locally as the planning document.
+
+## The Look
+
+- **No design skill was available.** The brief asks for the polish to follow an installed frontend design skill. None was installed in this environment, so the design follows the brief's own direction directly; [FRONTEND.md](FRONTEND.md) describes it.
+- **Fonts come from Google Fonts**, which the brief allows. Every font stack ends in a local fallback, so the demo still works offline, just in Georgia and the system sans.
+- **Mock descriptions keep the user's own casing.** "a dozen eggs" stays lowercase, matching the seeded pantry, instead of being capitalized into "A dozen eggs".

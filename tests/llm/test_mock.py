@@ -29,8 +29,8 @@ KITCHEN = [
 def test_parsing_splits_a_sentence_into_items_and_keeps_the_quantities():
     items = mock.parse_items("I bought a dozen eggs, half gallon of milk and 3 bananas", TODAY)
     assert [(i.name, i.description) for i in items] == [
-        ("Eggs", "A dozen eggs"),
-        ("Milk", "Half gallon of milk"),
+        ("Eggs", "a dozen eggs"),
+        ("Milk", "half gallon of milk"),
         ("Bananas", "3 bananas"),
     ]
 
@@ -148,8 +148,8 @@ def test_the_same_question_always_gets_the_same_answer():
 def test_parentheses_hold_a_note_together_and_expiry_comes_from_the_food():
     items = mock.parse_items("Lemons (two, organic), Bread (for grilled cheese and tomato soup)", TODAY)
     assert [(i.name, i.description) for i in items] == [
-        ("Lemons", "Two, organic"),
-        ("Bread", "For grilled cheese and tomato soup"),
+        ("Lemons", "two, organic"),
+        ("Bread", "for grilled cheese and tomato soup"),
     ]
     assert items[1].expires_on == (TODAY + timedelta(days=5)).isoformat()
 

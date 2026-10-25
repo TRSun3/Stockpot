@@ -70,6 +70,17 @@ export function resetRecipes() {
   show($("#recipes-empty"), true);
 }
 
+// "25 min · 3 from your kitchen · 1 to buy"
+function meta(recipe) {
+  const have = recipe.uses.length;
+  const need = recipe.missing.length;
+  return [
+    minutes(recipe.time_minutes),
+    `${have} from your kitchen`,
+    need ? `${need} to buy` : "nothing to buy",
+  ];
+}
+
 function recipeCard(recipe, { savedId } = {}) {
   const result = el("div", { class: "card-result" });
   const card = el(
@@ -79,7 +90,7 @@ function recipeCard(recipe, { savedId } = {}) {
       "header",
       { class: "recipe-head" },
       el("h3", { text: recipe.title }),
-      el("span", { class: "recipe-time", text: minutes(recipe.time_minutes) })
+      el("p", { class: "recipe-meta" }, meta(recipe).map((part) => el("span", { text: part })))
     ),
     recipe.summary ? el("p", { class: "recipe-summary", text: recipe.summary }) : null,
     recipe.why ? el("p", { class: "recipe-why", text: recipe.why }) : null,

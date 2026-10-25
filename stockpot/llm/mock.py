@@ -283,7 +283,7 @@ LIBRARY = (
         30,
         "cozy comfort dinner celebrate",
         [
-            need("chicken", "the chicken thighs", "chicken"),
+            need("chicken", "all of it", "chicken"),
             need("garlic", "4 cloves, sliced"),
             need("cream", "about a cup", "cream", "milk"),
             need("spinach", "a couple of handfuls", optional=True),
@@ -388,7 +388,7 @@ LIBRARY = (
         45,
         "cozy comfort sick dinner",
         [
-            need("chicken", "the chicken", "chicken"),
+            need("chicken", "all of it", "chicken"),
             need("carrots", "2, sliced", "carrot"),
             need("celery", "2 stalks, sliced", optional=True),
             need("onion", "1, diced", "onion"),
@@ -736,7 +736,6 @@ class Mock(LLM):
             parts = [food] if food.lower() != name.lower() else []
             parts += [detail.group(1).strip()] if detail and detail.group(1).strip() else []
             description = ", ".join(parts)
-            description = description[:1].upper() + description[1:]
             items.append(ParsedItem(name=name, description=description, expires_on=expiry(food, today)))
         return items
 

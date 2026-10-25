@@ -34,7 +34,7 @@ def test_groceries_typed_as_a_sentence_become_items_with_sensible_expiries(neal)
     assert response.status_code == 201
     added = {item["name"]: item for item in response.json()}
     assert set(added) == {"Eggs", "Spinach", "Chicken thighs", "Cheddar"}
-    assert added["Eggs"]["description"] == "A dozen eggs"
+    assert added["Eggs"]["description"] == "a dozen eggs"
     assert [added[name]["days_left"] for name in ("Chicken thighs", "Spinach", "Eggs")] == [2, 5, 21]
     assert set(pantry_of(neal)) == set(added)
 
