@@ -23,6 +23,7 @@
   <link rel="modulepreload" href="/js/chat.js">
   <link rel="modulepreload" href="/js/dom.js">
   <link rel="modulepreload" href="/js/format.js">
+  <link rel="modulepreload" href="/js/home.js">
   <link rel="modulepreload" href="/js/notes.js">
   <link rel="modulepreload" href="/js/pantry.js">
   <link rel="modulepreload" href="/js/recipes.js">
@@ -33,14 +34,14 @@
   <a class="skip-link" href="#app-view">Skip to the kitchen</a>
 
   <header class="masthead">
-    <div class="brand">
+    <a class="brand" href="#home" title="Your kitchen">
       <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
         <path d="M6 13h20v9a6 6 0 0 1-6 6h-8a6 6 0 0 1-6-6z" fill="currentColor"/>
         <rect x="3" y="11" width="26" height="2.6" rx="1.3" fill="currentColor" opacity=".55"/>
         <path d="M12 8c0-2 2-2 2-4M18 8c0-2 2-2 2-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".55"/>
       </svg>
       <span class="brand-name">Stockpot</span>
-    </div>
+    </a>
     <div class="account" id="account" hidden>
       <span class="badge" id="mock-badge" hidden title="Answers come from Stockpot's built-in stand-in, not Gemini">
         <span class="badge-dot" aria-hidden="true"></span>Mock AI
@@ -249,6 +250,231 @@
       </form>
     </aside>
   </div>
+
+  <section id="home-view" class="home" hidden tabindex="-1" aria-labelledby="home-title">
+    <header class="home-head">
+      <h1 id="home-title">Your kitchen</h1>
+      <p id="home-summary"></p>
+      <p class="home-hint">Swipe to look around the kitchen.</p>
+    </header>
+    <div class="scene-frame">
+    <div class="scene">
+      <svg class="scene-art" viewBox="0 0 1200 640" aria-hidden="true">
+        <defs>
+          <linearGradient id="k-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" class="k-sky-top"/>
+            <stop offset="1" class="k-sky-bottom"/>
+          </linearGradient>
+          <radialGradient id="k-glow">
+            <stop offset="0" class="k-glow-in"/>
+            <stop offset="1" class="k-glow-out"/>
+          </radialGradient>
+          <clipPath id="k-glass"><rect x="478" y="78" width="244" height="164" rx="6"/></clipPath>
+          <pattern id="k-tiles" width="48" height="48" patternUnits="userSpaceOnUse">
+            <rect width="48" height="48" class="k-tile"/>
+            <path d="M0 .75H48M0 24.75H48M.75 0V24M24.75 24V48" class="k-grout"/>
+          </pattern>
+        </defs>
+
+        <rect width="1200" height="640" class="k-wall"/>
+        <rect x="285" y="296" width="880" height="96" fill="url(#k-tiles)"/>
+        <rect y="556" width="1200" height="84" class="k-floor"/>
+        <path d="M0 556H1200M140 556v84M420 556v84M700 556v84M980 556v84M0 598H1200" class="k-floor-line"/>
+
+        <g class="k-window">
+          <rect x="466" y="66" width="268" height="188" rx="10" class="k-frame"/>
+          <rect x="478" y="78" width="244" height="164" rx="6" fill="url(#k-sky)"/>
+          <g clip-path="url(#k-glass)">
+            <circle cx="676" cy="118" r="20" class="k-sun"/>
+            <path d="M672 100a22 22 0 1 0 22 30a17 17 0 1 1-22-30z" class="k-moon"/>
+            <g class="k-stars">
+              <circle cx="510" cy="100" r="1.8"/><circle cx="548" cy="132" r="1.4"/><circle cx="590" cy="96" r="1.6"/>
+              <circle cx="636" cy="150" r="1.3"/><circle cx="700" cy="170" r="1.5"/><circle cx="526" cy="170" r="1.2"/>
+            </g>
+            <g class="k-cloud k-cloud-a">
+              <path d="M470 130h58a14 14 0 0 0-9-25a18 18 0 0 0-33-4a13 13 0 0 0-16 29z"/>
+            </g>
+            <g class="k-cloud k-cloud-b">
+              <path d="M520 176h44a11 11 0 0 0-7-19a14 14 0 0 0-26-3a10 10 0 0 0-11 22z"/>
+            </g>
+            <path d="M478 242v-34c26-14 48-18 70-10s40 2 60-8 46-10 64-2 34 10 50 6v48z" class="k-hills"/>
+          </g>
+          <path d="M600 78v164M478 160h244" class="k-mullion"/>
+          <rect x="454" y="250" width="292" height="12" rx="3" class="k-wood"/>
+          <g class="k-plant">
+            <path d="M684 230c-6-18-20-22-26-34M690 230c2-20 10-30 22-36M696 230c6-14 18-16 26-24" class="k-stem"/>
+            <ellipse cx="658" cy="198" rx="10" ry="6" transform="rotate(-35 658 198)" class="k-leaf"/>
+            <ellipse cx="712" cy="192" rx="11" ry="6" transform="rotate(30 712 192)" class="k-leaf"/>
+            <ellipse cx="722" cy="206" rx="9" ry="5" transform="rotate(10 722 206)" class="k-leaf"/>
+            <ellipse cx="672" cy="214" rx="8" ry="5" transform="rotate(-20 672 214)" class="k-leaf"/>
+            <path d="M676 228h40l-5 22h-30z" class="k-terracotta"/>
+          </g>
+        </g>
+
+        <g class="k-lamp">
+          <path d="M392 0v74" class="k-cord"/>
+          <ellipse cx="392" cy="118" rx="70" ry="22" fill="url(#k-glow)" class="k-lamp-light"/>
+          <path d="M362 106l10-30h40l10 30z" class="k-terracotta"/>
+          <rect x="386" y="70" width="12" height="8" rx="2" class="k-steel"/>
+        </g>
+
+        <g class="k-fridge" data-go="tab-shopping">
+          <rect x="64" y="140" width="204" height="418" rx="18" class="k-fridge-body"/>
+          <path d="M64 284h204" class="k-fridge-line"/>
+          <rect x="234" y="166" width="10" height="84" rx="5" class="k-steel"/>
+          <rect x="234" y="302" width="10" height="132" rx="5" class="k-steel"/>
+          <rect x="84" y="554" width="22" height="6" rx="2" class="k-steel"/>
+          <rect x="226" y="554" width="22" height="6" rx="2" class="k-steel"/>
+          <g class="k-polaroid">
+            <rect x="96" y="176" width="54" height="62" rx="2" class="k-paper"/>
+            <rect x="102" y="182" width="42" height="38" class="k-photo"/>
+            <circle cx="118" cy="196" r="7" class="k-sun"/>
+            <path d="M102 220l14-14 10 8 8-6 10 12z" class="k-hills"/>
+          </g>
+          <circle cx="182" cy="196" r="9" class="k-magnet-a"/>
+          <circle cx="204" cy="222" r="7" class="k-magnet-b"/>
+          <g class="k-note">
+            <rect x="94" y="316" width="128" height="164" rx="4" class="k-paper k-shadowed"/>
+            <path d="M106 366h104M106 390h104M106 414h104M106 438h104M106 462h104" class="k-rule"/>
+            <text x="108" y="352" class="k-note-title">Shopping</text>
+            <text x="110" y="384" class="k-hand" id="home-note-0"></text>
+            <text x="110" y="408" class="k-hand" id="home-note-1"></text>
+            <text x="110" y="432" class="k-hand" id="home-note-2"></text>
+            <text x="110" y="456" class="k-hand" id="home-note-3"></text>
+            <circle cx="158" cy="318" r="9" class="k-magnet-c"/>
+          </g>
+        </g>
+
+        <g class="k-hat" data-go="chat">
+          <circle cx="330" cy="150" r="5" class="k-steel"/>
+          <path d="M330 155v14" class="k-cord"/>
+          <g class="k-hat-body">
+            <path d="M312 214a16 16 0 0 1 1-32a19 19 0 0 1 34 0a16 16 0 0 1 1 32z" class="k-paper k-outline"/>
+            <rect x="313" y="212" width="34" height="18" rx="3" class="k-paper k-outline"/>
+            <path d="M313 220h34" class="k-hat-band"/>
+          </g>
+        </g>
+
+        <rect x="285" y="404" width="880" height="152" class="k-cabinet"/>
+        <path d="M392 404v152M500 404v152M700 404v152M820 404v152M940 404v152M1060 404v152" class="k-cabinet-line"/>
+        <circle cx="378" cy="430" r="4" class="k-knob"/><circle cx="406" cy="430" r="4" class="k-knob"/>
+        <circle cx="806" cy="430" r="4" class="k-knob"/><circle cx="834" cy="430" r="4" class="k-knob"/>
+        <circle cx="1046" cy="430" r="4" class="k-knob"/><circle cx="1074" cy="430" r="4" class="k-knob"/>
+        <rect x="278" y="388" width="894" height="18" rx="4" class="k-counter"/>
+
+        <g class="k-board">
+          <rect x="296" y="300" width="70" height="90" rx="14" class="k-wood"/>
+          <circle cx="331" cy="314" r="5" class="k-wall"/>
+          <path d="M310 340h42M310 352h42" class="k-wood-grain"/>
+        </g>
+        <g class="k-crock">
+          <path d="M418 318l-6-34M434 316l2-40M448 318l10-30" class="k-utensil"/>
+          <circle cx="412" cy="282" r="7" class="k-utensil-head"/>
+          <ellipse cx="436" cy="274" rx="6" ry="9" class="k-utensil-head"/>
+          <rect x="406" y="316" width="58" height="72" rx="10" class="k-terracotta"/>
+          <path d="M406 334h58" class="k-crock-band"/>
+        </g>
+
+        <g class="k-stove" data-go="tab-recipes">
+          <rect x="500" y="404" width="200" height="152" class="k-stove-body"/>
+          <circle cx="532" cy="420" r="6" class="k-knob-light"/><circle cx="562" cy="420" r="6" class="k-knob-light"/>
+          <circle cx="638" cy="420" r="6" class="k-knob-light"/><circle cx="668" cy="420" r="6" class="k-knob-light"/>
+          <rect x="530" y="434" width="140" height="6" rx="3" class="k-steel"/>
+          <rect x="524" y="450" width="152" height="80" rx="8" class="k-oven-glass"/>
+          <rect x="534" y="460" width="132" height="60" rx="5" class="k-oven-light"/>
+          <rect x="516" y="380" width="168" height="10" rx="3" class="k-grate"/>
+          <g class="k-steam">
+            <path d="M578 284c-10-14 10-24 0-38s10-24 0-38" class="k-wisp k-wisp-a"/>
+            <path d="M600 280c-10-14 10-24 0-38s10-24 0-38" class="k-wisp k-wisp-b"/>
+            <path d="M622 284c-10-14 10-24 0-38s10-24 0-38" class="k-wisp k-wisp-c"/>
+          </g>
+          <g class="k-pot">
+            <path d="M548 324h104v38a24 24 0 0 1-24 24h-56a24 24 0 0 1-24-24z" class="k-terracotta"/>
+            <rect x="534" y="332" width="18" height="8" rx="4" class="k-terracotta-dark"/>
+            <rect x="648" y="332" width="18" height="8" rx="4" class="k-terracotta-dark"/>
+            <path d="M548 346h104" class="k-pot-band"/>
+            <g class="k-lid">
+              <path d="M542 324a58 22 0 0 1 116 0z" class="k-terracotta-dark"/>
+              <rect x="592" y="294" width="16" height="10" rx="4" class="k-wood"/>
+            </g>
+          </g>
+        </g>
+
+        <g class="k-box" data-go="tab-box">
+          <rect x="770" y="300" width="96" height="40" rx="4" transform="rotate(-8 770 340)" class="k-wood-dark"/>
+          <g class="k-cards">
+            <rect x="780" y="314" width="76" height="40" rx="3" class="k-paper k-outline k-card-a"/>
+            <rect x="788" y="306" width="76" height="40" rx="3" class="k-paper k-outline k-card-b"/>
+            <rect x="784" y="318" width="76" height="40" rx="3" class="k-paper k-outline k-card-c"/>
+            <rect x="842" y="300" width="16" height="10" rx="2" class="k-tab-a"/>
+            <rect x="796" y="312" width="16" height="10" rx="2" class="k-tab-b"/>
+          </g>
+          <rect x="766" y="336" width="104" height="54" rx="5" class="k-wood"/>
+          <rect x="802" y="352" width="32" height="14" rx="2" class="k-brass"/>
+        </g>
+
+        <g class="k-shelves" data-go="tab-kitchen">
+          <rect x="866" y="160" width="268" height="10" rx="2" class="k-wood"/>
+          <rect x="866" y="236" width="268" height="10" rx="2" class="k-wood"/>
+          <rect x="866" y="312" width="268" height="10" rx="2" class="k-wood"/>
+          <path d="M884 170v12M1116 170v12M884 246v12M1116 246v12M884 322v12M1116 322v12" class="k-bracket"/>
+          <g class="k-jar k-jar-1">
+            <rect x="884" y="110" width="44" height="50" rx="8" class="k-glass"/>
+            <rect x="888" y="128" width="36" height="30" rx="5" class="k-rice"/>
+            <rect x="882" y="104" width="48" height="10" rx="3" class="k-wood-dark"/>
+          </g>
+          <g class="k-jar k-jar-2">
+            <rect x="944" y="98" width="40" height="62" rx="8" class="k-glass"/>
+            <rect x="948" y="112" width="32" height="46" rx="5" class="k-pasta"/>
+            <rect x="942" y="92" width="44" height="10" rx="3" class="k-wood-dark"/>
+          </g>
+          <g class="k-jar k-jar-3">
+            <rect x="1000" y="116" width="40" height="44" rx="8" class="k-glass"/>
+            <rect x="1004" y="134" width="32" height="24" rx="5" class="k-beans"/>
+            <rect x="998" y="110" width="44" height="10" rx="3" class="k-wood-dark"/>
+          </g>
+          <g class="k-jar k-jar-4">
+            <rect x="1060" y="122" width="52" height="38" rx="6" class="k-tin"/>
+            <rect x="1060" y="132" width="52" height="16" class="k-tin-label"/>
+          </g>
+          <g class="k-jar k-jar-2">
+            <rect x="888" y="194" width="34" height="42" rx="4" class="k-can-a"/>
+            <rect x="888" y="204" width="34" height="20" class="k-paper"/>
+          </g>
+          <g class="k-jar k-jar-3">
+            <rect x="930" y="194" width="34" height="42" rx="4" class="k-can-b"/>
+            <rect x="930" y="204" width="34" height="20" class="k-paper"/>
+          </g>
+          <g class="k-jar k-jar-1">
+            <path d="M992 236v-44a6 6 0 0 1 6-6h4v-14h12v14h4a6 6 0 0 1 6 6v44z" class="k-bottle"/>
+            <rect x="994" y="204" width="28" height="18" rx="2" class="k-paper"/>
+          </g>
+          <g class="k-jar k-jar-4">
+            <rect x="1046" y="200" width="66" height="36" rx="6" class="k-tin"/>
+            <path d="M1046 212h66" class="k-tin-band"/>
+          </g>
+          <g class="k-jar k-jar-3">
+            <path d="M890 312h96a48 22 0 0 1-96 0z" class="k-bowl" transform="translate(0 -22)"/>
+            <circle cx="914" cy="284" r="13" class="k-lemon"/><circle cx="938" cy="280" r="13" class="k-lemon"/>
+            <circle cx="962" cy="285" r="13" class="k-lemon"/><circle cx="927" cy="270" r="12" class="k-lemon"/>
+            <circle cx="951" cy="268" r="12" class="k-lime"/>
+          </g>
+          <g class="k-jar k-jar-1">
+            <rect x="1028" y="276" width="84" height="12" rx="4" class="k-wood"/>
+            <rect x="1032" y="264" width="76" height="12" rx="4" class="k-terracotta"/>
+            <rect x="1036" y="252" width="68" height="12" rx="4" class="k-olive"/>
+          </g>
+        </g>
+      </svg>
+
+      <button type="button" class="spot spot-shopping" data-go="tab-shopping">Shopping list</button>
+      <button type="button" class="spot spot-kitchen" data-go="tab-kitchen">Kitchen</button>
+      <button type="button" class="spot spot-recipes" data-go="tab-recipes">Recipes</button>
+      <button type="button" class="spot spot-box" data-go="tab-box">Recipe box</button>
+      <button type="button" class="spot spot-chat" data-go="chat">Ask the cook</button>
+    </div>
+    </div>
+  </section>
 
   <dialog id="notes-dialog" aria-labelledby="notes-title">
     <form id="notes-form" class="stack">

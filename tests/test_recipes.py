@@ -145,7 +145,16 @@ def test_the_recipe_box_keeps_recipes_for_their_owner_only(neal, tianyue):
 def test_a_dish_with_no_name_or_a_recipe_with_no_steps_is_refused(neal):
     assert neal.post("/api/recipes/plan", json={"dish": "???"}).status_code == 422
     blank = {"title": " ", "summary": "", "time_minutes": 5, "uses": [], "missing": [], "steps": [], "why": ""}
-    assert neal.post("/api/recipes/tweak", json={"recipe": blank, "feedback": "spicier"}).status_code == 422
+    for path, body in [
+        ("/api/recipes/tweak", {"recipe": blank, "feedback": "spicier"}),
+        ("/api/recipes/saved", {"recipe": blank}),
+        ("/api/recipes/cooked", {"recipe": blank}),
+    ]:
+        response = neal.post(path, json=body)
+        assert (response.status_code, response.json()["error"]) == (
+            422,
+            "A recipe needs a title and at least one step.",
+        )
 
 
 def test_suggestions_are_capped_at_four(app, neal):

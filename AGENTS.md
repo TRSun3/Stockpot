@@ -21,7 +21,7 @@ Python and packages are managed with `uv` only: `uv add`, `uv add --dev`, `uv ru
 
 ## Dependencies
 
-- Runtime packages are `fastapi`, `uvicorn`, and `google-genai`. Everything else is the standard library.
+- Runtime packages are `fastapi`, `uvicorn`, and `google-genai`. Everything else is the standard library, or comes with those three (like `pydantic` and `starlette` with `fastapi`).
 - Dev-only packages are `pytest`, `httpx`, `ruff`, and `playwright`. Any new package needs a reason in `docs/DECISIONS.md`.
 - The frontend is vanilla HTML, CSS, and JavaScript modules served as static files. No frameworks, bundlers, or Node toolchain.
 - The only LLM provider is Google Gemini. The mock stands in for it when no key is configured.

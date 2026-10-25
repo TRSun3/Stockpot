@@ -49,11 +49,22 @@ export function toast(message, kind = "info", ...actions) {
   return note;
 }
 
+// Shows a failure as an error toast. A 401 is left out: the session has ended, the login screen says so, and a
+// toast added after that screen cleared the page would linger into the next login.
+export function reportError(error) {
+  if (error?.status === 401) return;
+  toast(error?.message || "Something went wrong. Please try again.", "error");
+}
+
 // Runs `task` with the button disabled and marked busy, so a second click can't submit twice.
 // With `done`, the button stays disabled afterwards showing that text, for actions that only make sense once.
+// Disabling a button drops keyboard focus, so focus comes back to it afterwards, or to the control with the same
+// `data-key` if a re-render replaced it, unless the task moved focus somewhere on purpose.
 export async function busy(button, task, label = "Working…", done) {
   if (button.disabled) return undefined;
   const original = button.textContent;
+  const hadFocus = document.activeElement === button;
+  const key = button.dataset.key;
   let succeeded = false;
   button.disabled = true;
   button.setAttribute("aria-busy", "true");
@@ -63,7 +74,7 @@ export async function busy(button, task, label = "Working…", done) {
     succeeded = true;
     return result;
   } catch (error) {
-    toast(error.message || "Something went wrong.", "error");
+    reportError(error);
     return undefined;
   } finally {
     button.removeAttribute("aria-busy");
@@ -72,6 +83,19 @@ export async function busy(button, task, label = "Working…", done) {
     } else {
       button.disabled = false;
       button.textContent = original;
+    }
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (hadFocus && lost) {
+      const target = button.isConnected ? button : key && document.querySelector(`[data-key="${CSS.escape(key)}"]`);
+      // A button that stays disabled, like "Cooked", can't hold focus; the card or panel around it takes it, so
+      // the next Tab carries on from the same place.
+      const fallback = button.closest(".recipe, .card, [role=tabpanel], #home-view") || $("#app-view");
+      if (target && !target.disabled) {
+        target.focus({ preventScroll: true });
+      } else {
+        if (!fallback.hasAttribute("tabindex")) fallback.setAttribute("tabindex", "-1");
+        fallback.focus({ preventScroll: true });
+      }
     }
   }
 }
@@ -120,7 +144,7 @@ export function on(name, handler) {
 }
 
 // "Updated milk, removed eggs" for the changes the API reports after cooking or an adjustment.
-export function describeChanges(result) {
+function describeChanges(result) {
   const words = { added: "Added", updated: "Updated", removed: "Removed" };
   const parts = result.changes.map((change, index) => {
     const verb = words[change.action] || change.action;

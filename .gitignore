@@ -11,4 +11,5 @@ __pycache__/
 *.db-shm
 
 screenshots/
+.DS_Store
 STOCKPOT_BRIEF.md

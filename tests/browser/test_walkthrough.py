@@ -73,20 +73,31 @@ def browser():
 
 
 @pytest.fixture
-def window(browser, server):
-    """A fresh browser context, like its own private window, that fails the test on any page error."""
-    context = browser.new_context(base_url=server, viewport={"width": 1440, "height": 900})
-    page = context.new_page()
-    problems = []
-    page.on("pageerror", lambda error: problems.append(str(error)))
-    page.on(
-        "console",
-        lambda message: message.type == "error" and not expected(message.text) and problems.append(message.text),
-    )
-    page.on("dialog", lambda dialog: problems.append(f"unexpected dialog: {dialog.message}") or dialog.dismiss())
-    yield page
-    context.close()
+def windows(browser, server):
+    """Opens fresh browser contexts, each like its own private window. Any page error in any of them fails the test."""
+    contexts, problems = [], []
+
+    def open_window(width=1440, height=900, **options):
+        context = browser.new_context(base_url=server, viewport={"width": width, "height": height}, **options)
+        contexts.append(context)
+        page = context.new_page()
+        page.on("pageerror", lambda error: problems.append(str(error)))
+        page.on(
+            "console",
+            lambda message: message.type == "error" and not expected(message.text) and problems.append(message.text),
+        )
+        page.on("dialog", lambda dialog: problems.append(f"unexpected dialog: {dialog.message}") or dialog.dismiss())
+        return page
+
+    yield open_window
+    for context in contexts:
+        context.close()
     assert problems == []
+
+
+@pytest.fixture
+def window(windows):
+    return windows()
 
 
 def expected(console_text):
@@ -320,11 +331,10 @@ def test_the_chat_streams_a_reply_and_leads_to_recipes(window):
     assert hat.bounding_box() == spot
 
 
-def test_two_windows_hold_two_separate_kitchens(window, browser, server):
+def test_two_windows_hold_two_separate_kitchens(window, windows):
     neal = window
     log_in(neal, "neal")
-    private = browser.new_context(base_url=server, viewport={"width": 1440, "height": 900})
-    tianyue = private.new_page()
+    tianyue = windows()
     log_in(tianyue, "tianyue")
     neal_items, tianyue_items = set(pantry_names(neal)), set(pantry_names(tianyue))
     assert "Tofu" in tianyue_items and "Tofu" not in neal_items
@@ -333,7 +343,6 @@ def test_two_windows_hold_two_separate_kitchens(window, browser, server):
     neal.locator("#app-view").wait_for()
     assert neal.locator("#username").text_content() == "neal"
     shot(tianyue, "09-second-account")
-    private.close()
 
 
 def test_text_from_users_and_the_ai_is_shown_as_text_never_run_as_html(window):
@@ -350,7 +359,47 @@ def test_text_from_users_and_the_ai_is_shown_as_text_never_run_as_html(window):
     assert page.title() == "Stockpot"
 
 
-def test_the_masthead_and_tabs_stay_at_the_top_while_the_page_scrolls(window, browser, server):
+def test_the_pot_opens_a_kitchen_home_whose_objects_lead_to_each_part_of_the_app(window, windows):
+    page = window
+    log_in(page, "neal")
+    page.locator(".brand").click()
+    home = page.locator("#home-view")
+    expect(home).to_be_visible()
+    expect(page.locator("#home-title")).to_contain_text("neal.")
+    to_buy = [entry["name"] for entry in page.request.get("/api/shopping").json() if not entry["checked"]]
+    expect(page.locator("#home-note-0")).to_have_text(to_buy[0] if to_buy else "All stocked up")
+    shot(page, "13-kitchen-home")
+
+    for label, tab in [("Shopping list", "Shopping list"), ("Recipes", "Recipes"), ("Kitchen", "Kitchen")]:
+        home.get_by_role("button", name=label, exact=True).click()
+        expect(home).to_be_hidden()
+        expect(page.get_by_role("tab", name=tab)).to_have_attribute("aria-selected", "true")
+        page.go_back()
+        expect(home).to_be_visible()
+        expect(home).to_be_focused()
+    page.go_forward()
+    expect(page.get_by_role("tab", name="Kitchen")).to_be_focused()
+    page.go_back()
+
+    page.locator(".k-box").click()
+    expect(page.get_by_role("tab", name="Recipe box")).to_have_attribute("aria-selected", "true")
+    page.go_back()
+    home.get_by_role("button", name="Recipe box").focus()
+    page.keyboard.press("Enter")
+    expect(page.get_by_role("tab", name="Recipe box")).to_be_focused()
+    page.go_back()
+    home.get_by_role("button", name="Ask the cook").click()
+    expect(page.get_by_label("Message")).to_be_focused()
+
+    phone = windows(390, 844)
+    log_in(phone, "tianyue")
+    phone.locator(".brand").click()
+    phone.locator("#home-view").wait_for()
+    assert phone.locator(".scene-frame").evaluate("frame => frame.scrollLeft > 0")
+    assert phone.evaluate("document.documentElement.scrollWidth") <= 390
+
+
+def test_the_masthead_and_tabs_stay_at_the_top_while_the_page_scrolls(window, windows):
     page = window
     log_in(page, "neal")
     page.mouse.wheel(0, 5000)
@@ -361,30 +410,26 @@ def test_the_masthead_and_tabs_stay_at_the_top_while_the_page_scrolls(window, br
     assert abs(page.locator("#chat-panel").bounding_box()["y"] - masthead["height"]) <= 1
     expect(page.get_by_role("tab", name="Recipes")).to_be_in_viewport()
 
-    phone = browser.new_context(base_url=server, viewport={"width": 390, "height": 844}).new_page()
+    phone = windows(390, 844)
     log_in(phone, "tianyue")
     phone.mouse.wheel(0, 3000)
     phone.wait_for_function("() => window.scrollY > 400")
     assert phone.locator(".tabs").bounding_box()["y"] == 0
     expect(phone.locator(".masthead")).not_to_be_in_viewport()
-    phone.context.close()
 
 
-def test_the_kitchen_fits_a_phone_width_window_without_sideways_scrolling(browser, server):
-    context = browser.new_context(base_url=server, viewport={"width": 390, "height": 844})
-    page = context.new_page()
+def test_the_kitchen_fits_a_phone_width_window_without_sideways_scrolling(windows):
+    page = windows(390, 844)
     log_in(page, "tianyue")
     for tab in ("Kitchen", "Shopping list", "Recipes", "Recipe box"):
         page.get_by_role("tab", name=tab).click()
         assert page.evaluate("document.documentElement.scrollWidth") <= 390, tab
     page.get_by_role("tab", name="Kitchen").click()
     shot(page, "10-phone")
-    context.close()
 
 
-def test_dark_mode_follows_the_system_and_the_toggle_switches_it(browser, server):
-    context = browser.new_context(base_url=server, viewport={"width": 1440, "height": 900}, color_scheme="dark")
-    page = context.new_page()
+def test_dark_mode_follows_the_system_and_the_toggle_switches_it(windows):
+    page = windows(color_scheme="dark")
     log_in(page, "neal")
     background = "getComputedStyle(document.body).backgroundColor"
     dark = page.evaluate(background)
@@ -398,4 +443,3 @@ def test_dark_mode_follows_the_system_and_the_toggle_switches_it(browser, server
     page.reload()
     page.locator("#app-view").wait_for()
     assert page.evaluate("document.documentElement.dataset.theme") == "light"
-    context.close()

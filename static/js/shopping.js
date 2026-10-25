@@ -3,7 +3,7 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { freshnessLabel } from "./format.js";
-import { busy, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js";
+import { busy, emit, keepFocus, latestOnly, on, onSubmit, reportError } from "./ui.js";
 
 let entries = [];
 let loaded = false;
@@ -22,14 +22,15 @@ export function initShopping() {
   });
 
   $("#move-to-pantry").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
     await busy(
-      event.currentTarget,
+      button,
       async () => {
         const { moved } = await api("POST", "/api/shopping/move-to-pantry");
         $("#move-result").replaceChildren(
           el(
             "div",
-            { class: "changes", role: "status" },
+            { class: "changes", role: "status", tabindex: "-1" },
             el("p", { text: `Moved ${moved.length} item${moved.length === 1 ? "" : "s"} into your pantry.` }),
             el(
               "ul",
@@ -46,6 +47,10 @@ export function initShopping() {
       "Moving…"
     );
     syncMoveButton();
+    // With nothing left checked the button disables itself; keyboard focus moves on to what was moved.
+    if (button.disabled && (document.activeElement === button || document.activeElement === document.body)) {
+      $("#move-result .changes")?.focus({ preventScroll: true });
+    }
   });
 
   on("shopping", loadShopping);
@@ -62,8 +67,15 @@ export async function loadShopping() {
     if (editing && !entries.some((entry) => entry.id === editing.id)) editing = null;
     keepFocus(render);
   } catch (error) {
-    toast(error.message, "error");
+    reportError(error);
   }
+}
+
+// The names still to buy, in list order, for the note on the kitchen home's fridge.
+export function stillToBuy() {
+  return sorted()
+    .filter((entry) => !entry.checked)
+    .map((entry) => entry.name);
 }
 
 export function resetShopping() {
@@ -108,7 +120,7 @@ async function toggle(entry, box) {
     updateEntry(entry.id, await api("PATCH", `/api/shopping/${entry.id}`, { checked }));
   } catch (error) {
     updateEntry(entry.id, { checked: !checked });
-    toast(error.message, "error");
+    reportError(error);
   }
   keepFocus(render);
 }

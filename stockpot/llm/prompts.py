@@ -1,4 +1,5 @@
-"""Every prompt Stockpot sends to Gemini. Each one carries today's date and the user's real pantry."""
+"""Every prompt Stockpot sends to Gemini. Each one carries today's date, and every prompt about the existing
+kitchen also carries the user's real pantry."""
 
 from datetime import date
 

@@ -18,7 +18,7 @@ Choices made where the brief was silent or where the project deviates from it, a
 - **Parsing groceries doesn't see the pantry.** The brief's prompt rule asks for the pantry in every system prompt, but `parse_items(text, today)` describes food that isn't in the pantry yet, so its prompt carries only today's date.
 - **Moving shopping into the pantry keeps the user's own names and notes.** The LLM only estimates each entry's expiry from its name. Passing notes through the parser split notes like "for Spinach and Cheddar Omelette" into extra items, and an entry the LLM dropped (like paper towels) vanished from both lists.
 - **Cooking may only touch the recipe's own items.** `apply_ops` takes the set of item ids the recipe used and refuses changes to anything else, in addition to refusing foreign or missing ids.
-- **The pantry holds each food once.** Adding six eggs to a dozen should give one entry, not two. Names match ignoring case, spacing, and plurals. The LLM writes the combined description, because only it can add up "6 left" and "a dozen", and it does so through `adjust_pantry` rather than a new prompt. That costs one extra call, about 2 s on Gemini, and only when something matches. If the call fails, the descriptions are joined rather than the add failing. The merged item keeps the sooner expiry, so Use Soon still warns before the older batch turns, at the cost of the newer batch looking older than it is. The owner chose both.
+- **The pantry holds each food once.** Adding six eggs to a dozen should give one entry, not two. Names match ignoring case, spacing, punctuation around words, and plurals. The LLM writes the combined description, because only it can add up "6 left" and "a dozen", and it does so through `adjust_pantry` rather than a new prompt. That costs one extra call, about 2 s on Gemini, and only when something matches. If the call fails, the descriptions are joined rather than the add failing. The merged item keeps the sooner expiry, so Use Soon still warns before the older batch turns, at the cost of the newer batch looking older than it is. The owner chose both.
 - **Recipe uses that name unknown items become missing ingredients** rather than errors. Fixing the answer keeps a useful recipe on screen.
 - **Parsed dates outside 30 days ago to 5 years ahead become "no expiry"**, rather than dropping the item.
 - **Kitchen notes are one free-text field**, not a form of diet checkboxes. That matches the brief's free-text item model, and the LLM reads "vegetarian, allergic to peanuts, no oven, cooking for two" as easily as it reads a pantry description. The brief listed per-user preferences as a nice-to-have; they are built now because every recipe flow benefits.
@@ -39,12 +39,11 @@ Choices made where the brief was silent or where the project deviates from it, a
 ## Failure Handling
 
 - **Nothing reaches the user as a crash.** Every request either answers or fails with a JSON error carrying a readable message. A failure inside a nice-to-have, such as the LLM merging a duplicate's description, falls back to a plain result instead of failing the request, and is logged in full so the bug stays visible. A failure mid-chat ends the stream with an `error` event, so the page never waits on a reply that will not come.
-- **Requests without a Content-Length are refused (411).** The 256 KB limit is checked before the body is read, which needs the length up front. Browsers always send it for Stockpot's requests.
+- **A body sent without a Content-Length (chunked) is refused (411).** The 256 KB limit is checked before the body is read, which needs the length up front. Browsers always send it for Stockpot's requests.
 
 ## Layout
 
 - **Module names follow what they hold.** `guard.py` is the brief's `services.py` safety layer. `kitchen.py` holds the routes where the AI changes the kitchen, kept apart from the pantry's plain CRUD in `pantry.py` so `guard` can build on `pantry` without an import cycle. Tests mirror the modules, so the brief's `test_items.py` and `test_llm_ops.py` are `test_pantry.py` and `test_guard.py`.
-
 - **Docs live in `docs/`**, including this file and `VERIFICATION.md`, rather than at the root as the brief sketches. This follows the conventions of the owner's other repositories. Only `README.md` and `AGENTS.md` sit at the root.
 - **The brief itself is not tracked.** `STOCKPOT_BRIEF.md` is in `.gitignore`. The owner keeps it locally as the planning document.
 

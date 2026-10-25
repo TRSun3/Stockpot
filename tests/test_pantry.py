@@ -89,13 +89,18 @@ def test_editing_changes_only_the_fields_sent_and_null_clears_the_expiry(neal):
         ("Brownies", "brownie"),
         ("Eggs.", "egg"),
         ("Glasses", "glass"),
+        ("Quiches", "quiche"),
+        ("Brioches", "brioche"),
     ],
 )
 def test_the_same_food_matches_however_its_name_is_written(first, second):
     assert pantry.food_key(first) == pantry.food_key(second)
 
 
-@pytest.mark.parametrize("first, second", [("Eggs", "Eggplant"), ("Pie", "Pear"), ("Turkey", "Turnip")])
+@pytest.mark.parametrize(
+    "first, second",
+    [("Eggs", "Eggplant"), ("Pie", "Pear"), ("Turkey", "Turnip"), ("!!!", "???"), ("Peach", "Peaches pie")],
+)
 def test_different_foods_never_match(first, second):
     assert pantry.food_key(first) != pantry.food_key(second)
 
@@ -108,6 +113,16 @@ def test_an_item_cannot_be_renamed_to_a_food_already_in_the_pantry(neal):
     assert response.json()["error"] == "Eggs is already in your pantry. Edit that one instead."
     assert neal.patch(f"/api/items/{milk['id']}", json={"name": "Oat milk"}).status_code == 200
     assert neal.patch(f"/api/items/{milk['id']}", json={"name": "oat milks"}).status_code == 200
+    assert neal.patch("/api/items/9999", json={"name": "Eggs"}).status_code == 404
+
+
+def test_an_item_with_an_older_duplicate_can_still_be_edited(app, neal):
+    first = add(neal, "Eggs", description="a dozen")
+    with app.state.pool.connection() as conn:
+        user_id = conn.execute("SELECT user_id FROM items WHERE id = ?", (first["id"],)).fetchone()["user_id"]
+        conn.execute("INSERT INTO items (user_id, name, description) VALUES (?, 'eggs', '6 left')", (user_id,))
+    edited = neal.patch(f"/api/items/{first['id']}", json={"name": "Eggs", "description": "a dozen, brown"})
+    assert (edited.status_code, edited.json()["description"]) == (200, "a dozen, brown")
 
 
 def test_a_discarded_item_is_gone(neal):

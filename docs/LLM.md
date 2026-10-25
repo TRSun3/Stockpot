@@ -13,7 +13,7 @@ Both backends implement the interface in `stockpot/llm/base.py`. Every method ex
 | Method | Turns | Into |
 |---|---|---|
 | `parse_items` | "a dozen eggs, a bag of spinach and some cheddar" | Items with a name, a description that keeps the quantities, and an estimated expiry |
-| `suggest_recipes` | The pantry and an optional mood or preference | Up to four recipes, favoring what expires soonest |
+| `suggest_recipes` | The pantry and an optional mood or preference | Recipes favoring what expires soonest: three from Gemini, up to four from the mock; the API keeps at most four |
 | `plan_recipe` | A dish the user names, like "carbonara" | A recipe showing what the pantry covers and what is missing |
 | `tweak_recipe` | A recipe and feedback, like "make it vegetarian" | The revised recipe |
 | `apply_cooking` | A recipe the user cooked | Updates and deletes for the items it used |
@@ -35,11 +35,11 @@ Adding a food that is already in the pantry asks `adjust_pantry` to fold the new
 
 The valid changes in a batch are applied together in one transaction, and each refused change is reported with its reason. One bad suggestion never blocks the good ones, and a crash partway through leaves the pantry untouched. The LLM never writes SQL, never sees other tables, and never chooses a `user_id`.
 
-When a Gemini call fails or times out (45 seconds), or answers with something that doesn't parse, the backend raises `LLMError`. The API turns that into a 502 with a friendly message, and nothing is changed. A rate limit (429) raises `LLMBusy` instead, which tells the user to give it a minute. Brief server overloads (500, 502, 503) are retried once, and no answer may run past 4096 tokens.
+When a Gemini call fails or times out (45 seconds), or answers with something that doesn't parse, the backend raises `LLMError`. The API turns that into a 502 with a friendly message, and nothing is changed. A rate limit (429) raises `LLMBusy` instead, which tells the user to give it a minute. Brief server overloads (500, 502, 503) are retried once. No structured answer may run past 4096 tokens; chat replies are kept short by the prompt.
 
 ## Gemini
 
-`stockpot/llm/gemini.py` asks for JSON (`response_mime_type="application/json"`) with the Pydantic model as `response_schema` for every method except chat. Chat streams through `generate_content_stream`, sending the last 20 messages as history. Every prompt lives in `stockpot/llm/prompts.py`. Each carries today's date. Every prompt about the existing kitchen also carries the pantry with item ids and how many days each item has left, and the user's kitchen notes where they apply. The structured prompts tell the model to refer only to listed item ids; the chat prompt tells it to mention only listed items.
+`stockpot/llm/gemini.py` asks for JSON (`response_mime_type="application/json"`) with the Pydantic model as `response_schema` for every method except chat. Chat streams through `generate_content_stream`, sending the last 20 messages as history. Every prompt lives in `stockpot/llm/prompts.py`. Each carries today's date. Every prompt about the existing kitchen also carries the pantry with item ids and how many days each item has left, and the user's kitchen notes where they apply. The chat also sees the shopping list, with checked entries marked. The structured prompts tell the model to refer only to listed item ids; the chat prompt tells it to mention only listed items.
 
 ## The Mock
 

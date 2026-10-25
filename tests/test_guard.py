@@ -160,6 +160,22 @@ def test_a_food_thrown_out_can_be_added_back_fresh_in_the_same_batch(conn, kitch
     assert names(conn, neal)["Milk"] == "a new gallon"
 
 
+def test_removing_one_of_two_copies_of_a_food_still_refuses_adding_it_again(conn, kitchen):
+    neal, _, mine, _ = kitchen
+    pantry.insert(conn, neal, "rice", "a second bag", None)
+    result = guard.apply_ops(
+        conn,
+        neal,
+        [PantryOp(op="delete", item_id=mine["Rice"]), PantryOp(op="add", name="Rice", description="a third bag")],
+        TODAY,
+        allow_add=True,
+    )
+    assert [r["reason"] for r in result["rejected"]] == [
+        "that's already in the pantry, so it should be updated instead"
+    ]
+    assert [row["description"] for row in pantry.rows(conn, neal) if row["name"].lower() == "rice"] == ["a second bag"]
+
+
 def test_a_failure_partway_through_leaves_the_pantry_exactly_as_it_was(conn, kitchen, monkeypatch):
     neal, _, mine, _ = kitchen
     before = names(conn, neal)

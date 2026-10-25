@@ -2,7 +2,7 @@
 
 import { api, stream } from "./api.js";
 import { el, $, show } from "./dom.js";
-import { busy, onSubmit, toast } from "./ui.js";
+import { busy, onSubmit, reportError } from "./ui.js";
 
 let lastAsked = "";
 let streaming = false;
@@ -23,6 +23,12 @@ function setChatOpen(open) {
   } catch {
     // The choice lasts until the page reloads.
   }
+}
+
+// Opens the chat, even if it was minimized, ready to type: the kitchen home's chef hat.
+export function openChat() {
+  setChatOpen(true);
+  $("#chat-input").focus();
 }
 
 export function initChat({ onRecipes }) {
@@ -64,7 +70,7 @@ export async function loadChat() {
   try {
     render(await api("GET", "/api/chat"));
   } catch (error) {
-    toast(error.message, "error");
+    reportError(error);
   }
 }
 

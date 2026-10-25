@@ -1,6 +1,7 @@
 """Nothing the LLM says reaches the database unchecked. This module checks it, trims it, and applies it."""
 
 import sqlite3
+from collections import Counter
 from datetime import date, timedelta
 
 from stockpot import db, pantry
@@ -106,13 +107,14 @@ def apply_ops(
     with db.transaction(conn):
         owned = {row["id"]: row for row in pantry.rows(conn, user_id)}
         owned_ids = set(owned)
-        foods = {pantry.food_key(row["name"]) for row in owned.values()}
+        # How many items hold each food, so removing one of two copies still leaves the food in the pantry.
+        foods = Counter(pantry.food_key(row["name"]) for row in owned.values())
         touched: set[int] = set()
         for op in ops[:MOST_ITEMS]:
             reason = check(op, owned_ids, allowed, allow_add, today)
             if reason is None and op.item_id in touched:
                 reason = "that item was already changed"
-            if reason is None and op.op == "add" and pantry.food_key(clean_text(op.name, 80)) in foods:
+            if reason is None and op.op == "add" and foods[pantry.food_key(clean_text(op.name, 80))] > 0:
                 reason = "that's already in the pantry, so it should be updated instead"
             if reason:
                 rejected.append({"op": describe(op), "reason": reason})
@@ -122,14 +124,14 @@ def apply_ops(
                 name = name[:1].upper() + name[1:]
                 description = clean_text(op.description, 500)
                 item_id = pantry.insert(conn, user_id, name, description, clean_date(op.expires_on, today))
-                foods.add(pantry.food_key(name))
+                foods[pantry.food_key(name)] += 1
                 changes.append({"action": "added", "item_id": item_id, "name": name, "description": description})
                 continue
             touched.add(op.item_id)
             item = owned[op.item_id]
             if op.op == "delete":
                 pantry.delete(conn, user_id, op.item_id)
-                foods.discard(pantry.food_key(item["name"]))
+                foods[pantry.food_key(item["name"])] -= 1
                 changes.append({"action": "removed", "item_id": op.item_id, "name": item["name"]})
                 continue
             update = {}

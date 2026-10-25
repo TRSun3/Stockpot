@@ -135,21 +135,29 @@ def plan_additions(
 def apply_additions(conn: sqlite3.Connection, user_id: int, additions: list[Addition]) -> list[int]:
     """Inserts the new items and updates the existing ones; returns the id of every item touched, in order.
 
-    Runs inside the caller's transaction, after the LLM has answered. An item edited since the plan was made
-    keeps that edit, with what was bought joined on, and one removed since is added back as just what was bought.
+    Runs inside the caller's transaction, after the LLM has answered, and checks the pantry again first. An item
+    edited since the plan was made keeps that edit, with what was bought joined on. A food that another request
+    added meanwhile is joined the same way rather than added twice, and an item removed since comes back as just
+    what was bought.
     """
+    foods = {pantry.food_key(row["name"]): row for row in pantry.rows(conn, user_id)}
     ids = []
     for entry in additions:
         current = pantry.row(conn, user_id, entry.item_id) if entry.item_id is not None else None
-        if current is None:
-            description = joined(*entry.bought) if entry.item_id is not None else entry.description
-            expires_on = entry.bought_expiry if entry.item_id is not None else entry.expires_on
-            ids.append(pantry.insert(conn, user_id, entry.name, description, expires_on))
-            continue
-        description, expires_on = entry.description, entry.expires_on
-        if (current["description"], expiry_of(current)) != (entry.had, entry.had_expiry):
-            description = joined(current["description"], *entry.bought)
-            expires_on = sooner(expiry_of(current), entry.bought_expiry)
+        if current is not None and (current["description"], expiry_of(current)) == (entry.had, entry.had_expiry):
+            description, expires_on = entry.description, entry.expires_on
+        else:
+            # What this request brought, joined onto whatever the pantry holds for the food right now.
+            brought = entry.bought if entry.item_id is not None else [entry.description]
+            brought_expiry = entry.bought_expiry if entry.item_id is not None else entry.expires_on
+            current = current or foods.get(pantry.food_key(entry.name))
+            if current is None:
+                item_id = pantry.insert(conn, user_id, entry.name, joined(*brought), brought_expiry)
+                foods[pantry.food_key(entry.name)] = pantry.row(conn, user_id, item_id)
+                ids.append(item_id)
+                continue
+            description = joined(current["description"], *brought)
+            expires_on = sooner(expiry_of(current), brought_expiry)
         pantry.update(conn, user_id, current["id"], {"description": description, "expires_on": expires_on})
         ids.append(current["id"])
     return ids

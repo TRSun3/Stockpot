@@ -6,7 +6,7 @@ The evals check what the LLM actually says, scenario by scenario, with assertion
 uv run python -m evals.run_evals                  # the backend .env selects
 uv run python -m evals.run_evals --backend gemini
 uv run python -m evals.run_evals --only suggest   # scenarios whose id contains "suggest"
-uv run python -m evals.run_evals --model gemini-3.6-flash   # try another Gemini API model
+uv run python -m evals.run_evals --model gemini-3.8-flash   # another Gemini model; implies --backend gemini
 uv run python -m evals.run_evals --all             # include the stable scenarios
 ```
 

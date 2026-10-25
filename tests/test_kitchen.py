@@ -107,6 +107,28 @@ class Reversed(Mock):
         return super().parse_items(text, today)[::-1]
 
 
+class Racing(Mock):
+    """Merges like the mock, but another request adds bread while the LLM is still working."""
+
+    def __init__(self, pool):
+        super().__init__(delay=0)
+        self.pool = pool
+
+    def adjust_pantry(self, instruction, pantry, today):
+        with self.pool.connection() as conn:
+            user_id = conn.execute("SELECT user_id FROM items LIMIT 1").fetchone()["user_id"]
+            conn.execute("INSERT INTO items (user_id, name, description) VALUES (?, 'Bread', 'a baguette')", (user_id,))
+        return super().adjust_pantry(instruction, pantry, today)
+
+
+def test_a_food_another_request_adds_meanwhile_is_joined_rather_than_doubled(app, neal):
+    neal.post("/api/items", json={"name": "Milk", "description": "half a gallon"})
+    app.state.llm = Racing(app.state.pool)
+    neal.post("/api/items/parse", json={"text": "a gallon of milk and a loaf of bread"})
+    breads = [item for item in neal.get("/api/items").json() if item["name"] == "Bread"]
+    assert [item["description"] for item in breads] == ["a baguette, plus a loaf of bread"]
+
+
 def test_a_shopping_entry_takes_the_expiry_of_its_own_food_not_one_whose_name_contains_it(app, neal):
     app.state.llm = Reversed(delay=0)
     for name in ("Ham", "Graham crackers"):

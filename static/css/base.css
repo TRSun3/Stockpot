@@ -437,6 +437,17 @@ input[type="date"] {
   gap: var(--space-3);
   margin-right: auto;
   min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: var(--radius-s);
+}
+
+.brand:hover .brand-mark {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+.brand-mark {
+  transition: transform 220ms var(--ease);
 }
 
 .brand-mark {
@@ -1455,6 +1466,362 @@ dialog h2 {
   margin-bottom: var(--space-1);
 }
 
+/* Kitchen home: an illustrated kitchen whose objects open each part of the app. Opened from the pot logo. */
+
+.home {
+  --k-wall: #efe5d3;
+  --k-tile: #f6efe3;
+  --k-grout: #e2d5bf;
+  --k-floor: #c9a77f;
+  --k-floor-line: #b5916a;
+  --k-wood: #b98a5e;
+  --k-wood-dark: #8e633d;
+  --k-cabinet: #e6d6bc;
+  --k-cabinet-line: #cfba99;
+  --k-counter: #f4ede1;
+  --k-counter-edge: #d6c6ac;
+  --k-fridge: #fbf7f0;
+  --k-fridge-line: #ddd0bb;
+  --k-steel: #b9afa1;
+  --k-stove: #3b2f28;
+  --k-oven-glass: #241c17;
+  --k-oven-light: #6b3a22;
+  --k-terracotta: #b04a22;
+  --k-terracotta-dark: #8a3618;
+  --k-paper: #fffaf1;
+  --k-ink: #3a2c22;
+  --k-outline: #cdbfa9;
+  --k-sky-top: #9ccbe6;
+  --k-sky-bottom: #f8dcbd;
+  --k-sun: #f5bf55;
+  --k-cloud: #fffaf2;
+  --k-hills: #a9bb8f;
+  --k-leaf: #6f8a4e;
+  --k-steam: #ffffff;
+  --k-glow: rgb(255 214 150 / 0.55);
+  --k-glass: rgb(255 255 255 / 0.55);
+  /* As wide as the page allows while the whole kitchen still fits on one screen below the greeting. */
+  --scene-width: min(100%, calc((100vh - var(--masthead-height, 5rem) - 11rem) * 1200 / 640));
+
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6) var(--space-7);
+  outline: none;
+}
+
+:root[data-theme="dark"] .home {
+  --k-wall: #231c17;
+  --k-tile: #2b231d;
+  --k-grout: #352b23;
+  --k-floor: #3e3025;
+  --k-floor-line: #33271e;
+  --k-wood: #7a5536;
+  --k-wood-dark: #5a3d26;
+  --k-cabinet: #2f261f;
+  --k-cabinet-line: #3f3329;
+  --k-counter: #3b3129;
+  --k-counter-edge: #4a3e34;
+  --k-fridge: #3b352f;
+  --k-fridge-line: #4c433b;
+  --k-steel: #80766b;
+  --k-stove: #161210;
+  --k-oven-glass: #0f0c0a;
+  --k-oven-light: #8a4422;
+  --k-terracotta: #c8582b;
+  --k-terracotta-dark: #9c4220;
+  --k-paper: #efe4d2;
+  --k-ink: #2b211b;
+  --k-outline: #8f8170;
+  --k-sky-top: #0f1628;
+  --k-sky-bottom: #2d2b48;
+  --k-cloud: #3c3b58;
+  --k-hills: #1b2621;
+  --k-leaf: #5d7442;
+  --k-steam: #b9ad9e;
+  --k-glow: rgb(255 190 120 / 0.45);
+  --k-glass: rgb(255 255 255 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .home {
+    --k-wall: #231c17;
+    --k-tile: #2b231d;
+    --k-grout: #352b23;
+    --k-floor: #3e3025;
+    --k-floor-line: #33271e;
+    --k-wood: #7a5536;
+    --k-wood-dark: #5a3d26;
+    --k-cabinet: #2f261f;
+    --k-cabinet-line: #3f3329;
+    --k-counter: #3b3129;
+    --k-counter-edge: #4a3e34;
+    --k-fridge: #3b352f;
+    --k-fridge-line: #4c433b;
+    --k-steel: #80766b;
+    --k-stove: #161210;
+    --k-oven-glass: #0f0c0a;
+    --k-oven-light: #8a4422;
+    --k-terracotta: #c8582b;
+    --k-terracotta-dark: #9c4220;
+    --k-paper: #efe4d2;
+    --k-ink: #2b211b;
+    --k-outline: #8f8170;
+    --k-sky-top: #0f1628;
+    --k-sky-bottom: #2d2b48;
+    --k-cloud: #3c3b58;
+    --k-hills: #1b2621;
+    --k-leaf: #5d7442;
+    --k-steam: #b9ad9e;
+    --k-glow: rgb(255 190 120 / 0.45);
+    --k-glass: rgb(255 255 255 / 0.12);
+  }
+}
+
+.home-head {
+  width: var(--scene-width);
+  margin: 0 auto var(--space-5);
+}
+
+.home-head h1 {
+  font-size: clamp(1.7rem, 1.2rem + 1.6vw, 2.5rem);
+  font-variation-settings: "opsz" 144;
+  letter-spacing: -0.02em;
+}
+
+.home-head p {
+  color: var(--muted);
+  margin-top: var(--space-2);
+}
+
+.home-hint {
+  display: none;
+}
+
+.scene-frame {
+  width: var(--scene-width);
+  margin: 0 auto;
+  border-radius: var(--radius-l);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--rule);
+  animation: rise 420ms var(--ease) both;
+}
+
+.scene {
+  position: relative;
+  aspect-ratio: 1200 / 640;
+}
+
+.scene-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Only the moving parts turn around their own box; static shapes keep their drawn transforms. */
+.k-note, .k-hat-body, .k-lid, .k-cards rect, .k-jar, .k-wisp, .k-lamp, .k-cloud, .k-stars circle, .k-oven-light {
+  transform-box: fill-box;
+}
+
+.scene-art [data-go] {
+  cursor: pointer;
+}
+
+.k-wall { fill: var(--k-wall); }
+.k-tile { fill: var(--k-tile); }
+.k-grout { fill: none; stroke: var(--k-grout); stroke-width: 1.5; }
+.k-floor { fill: var(--k-floor); }
+.k-floor-line { fill: none; stroke: var(--k-floor-line); stroke-width: 2; }
+.k-frame { fill: var(--k-wood); }
+.k-mullion { stroke: var(--k-wood); stroke-width: 6; }
+.k-sky-top { stop-color: var(--k-sky-top); }
+.k-sky-bottom { stop-color: var(--k-sky-bottom); }
+.k-glow-in { stop-color: var(--k-glow); }
+.k-glow-out { stop-color: var(--k-glow); stop-opacity: 0; }
+.k-sun { fill: var(--k-sun); }
+.k-moon, .k-stars { fill: #f3ead7; }
+.k-cloud { fill: var(--k-cloud); }
+.k-hills { fill: var(--k-hills); }
+.k-photo { fill: var(--k-sky-top); }
+.k-wood { fill: var(--k-wood); }
+.k-wood-dark { fill: var(--k-wood-dark); }
+.k-wood-grain { fill: none; stroke: var(--k-wood-dark); stroke-width: 2; stroke-linecap: round; opacity: 0.45; }
+.k-terracotta { fill: var(--k-terracotta); }
+.k-terracotta-dark { fill: var(--k-terracotta-dark); }
+.k-stem { fill: none; stroke: var(--k-leaf); stroke-width: 3; stroke-linecap: round; }
+.k-leaf, .k-olive { fill: var(--k-leaf); }
+.k-cord { stroke: var(--k-ink); stroke-width: 2; opacity: 0.6; }
+.k-steel { fill: var(--k-steel); }
+.k-fridge-body { fill: var(--k-fridge); stroke: var(--k-fridge-line); stroke-width: 2; }
+.k-fridge-line { stroke: var(--k-fridge-line); stroke-width: 3; }
+.k-paper { fill: var(--k-paper); }
+.k-outline { stroke: var(--k-outline); stroke-width: 1.5; }
+.k-shadowed { filter: drop-shadow(0 4px 5px rgb(43 33 27 / 0.18)); }
+.k-rule { stroke: #9ccbe6; stroke-width: 1; opacity: 0.7; }
+.k-note-title { font: 700 13px var(--font-ui); fill: var(--k-terracotta); letter-spacing: 0.04em; }
+.k-hand { font: 500 15px var(--font-display); fill: var(--k-ink); }
+.k-magnet-a { fill: #e2a63b; }
+.k-magnet-b { fill: var(--k-leaf); }
+.k-magnet-c { fill: var(--k-terracotta); filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.25)); }
+.k-hat-band { stroke: var(--k-outline); stroke-width: 1.5; }
+.k-cabinet { fill: var(--k-cabinet); }
+.k-cabinet-line { stroke: var(--k-cabinet-line); stroke-width: 3; }
+.k-knob { fill: var(--k-wood-dark); }
+.k-counter { fill: var(--k-counter); stroke: var(--k-counter-edge); stroke-width: 2; }
+.k-utensil { stroke: var(--k-wood-dark); stroke-width: 5; stroke-linecap: round; }
+.k-utensil-head { fill: var(--k-wood-dark); }
+.k-crock-band { stroke: var(--k-terracotta-dark); stroke-width: 4; }
+.k-stove-body { fill: var(--k-stove); }
+.k-knob-light { fill: var(--k-steel); }
+.k-oven-glass { fill: var(--k-oven-glass); }
+.k-oven-light { fill: var(--k-oven-light); opacity: 0.55; }
+.k-grate { fill: var(--k-stove); }
+.k-pot-band { stroke: var(--k-terracotta-dark); stroke-width: 3; }
+.k-wisp { fill: none; stroke: var(--k-steam); stroke-width: 7; stroke-linecap: round; opacity: 0; }
+.k-brass { fill: #d6a64a; }
+.k-tab-a { fill: var(--k-terracotta); }
+.k-tab-b { fill: var(--k-leaf); }
+.k-bracket { stroke: var(--k-wood-dark); stroke-width: 4; }
+.k-glass { fill: var(--k-glass); stroke: var(--k-outline); stroke-width: 1.5; }
+.k-rice { fill: #f3ecdc; }
+.k-pasta { fill: #e9c46a; }
+.k-beans { fill: #6b3b2a; }
+.k-tin { fill: var(--k-leaf); }
+.k-tin-label { fill: var(--k-paper); opacity: 0.85; }
+.k-tin-band { stroke: var(--k-paper); stroke-width: 4; opacity: 0.7; }
+.k-can-a { fill: var(--k-terracotta); }
+.k-can-b { fill: #d9a441; }
+.k-bottle { fill: #3a2a20; }
+.k-bowl { fill: var(--k-paper); stroke: var(--k-outline); stroke-width: 1.5; }
+.k-lemon { fill: #f2cd4c; }
+.k-lime { fill: #9cbf4a; }
+
+/* Day shows the sun and clouds; night shows the moon and stars. */
+.k-moon, .k-stars { display: none; }
+:root[data-theme="dark"] .k-moon, :root[data-theme="dark"] .k-stars { display: inline; }
+:root[data-theme="dark"] .k-window .k-sun { display: none; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .k-moon, :root:not([data-theme="light"]) .k-stars { display: inline; }
+  :root:not([data-theme="light"]) .k-window .k-sun { display: none; }
+}
+
+/* The kitchen is alive: steam rises, clouds drift, the lamp sways, stars twinkle. */
+.k-wisp { animation: steam 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+.k-wisp-b { animation-delay: 1.05s; }
+.k-wisp-c { animation-delay: 2.1s; }
+.k-cloud-a { animation: drift 46s linear infinite; }
+.k-cloud-b { animation: drift 64s linear infinite -30s; }
+.k-lamp { animation: sway 7s ease-in-out infinite; transform-origin: 50% 0; }
+.k-stars circle { animation: twinkle 3.6s ease-in-out infinite; }
+.k-stars circle:nth-child(2n) { animation-delay: 1.4s; }
+.k-stars circle:nth-child(3n) { animation-delay: 2.3s; }
+
+@keyframes steam {
+  0% { opacity: 0; transform: translateY(16px) scaleY(0.8); }
+  35% { opacity: 0.85; }
+  100% { opacity: 0; transform: translateY(-30px) scaleY(1.15); }
+}
+
+@keyframes drift {
+  from { transform: translateX(-90px); }
+  to { transform: translateX(300px); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-1.2deg); }
+  50% { transform: rotate(1.2deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Each object answers when its label or the object itself is pointed at. */
+.k-note, .k-hat-body, .k-lid, .k-cards rect, .k-jar, .k-oven-light {
+  transition: transform 260ms var(--ease), opacity 260ms var(--ease);
+}
+
+.k-note { transform: rotate(-4deg); transform-origin: 50% 0; }
+.k-hat-body { transform-origin: 50% 0; }
+.k-lid { transform-origin: 50% 100%; }
+
+.scene:has([data-go="tab-shopping"]:hover, .spot-shopping:focus-visible) .k-note { transform: rotate(0deg) translateY(-4px); }
+.scene:has([data-go="tab-recipes"]:hover, .spot-recipes:focus-visible) .k-lid { animation: lid 0.7s ease-in-out infinite; }
+.scene:has([data-go="tab-recipes"]:hover, .spot-recipes:focus-visible) .k-oven-light { opacity: 0.95; }
+.scene:has([data-go="tab-box"]:hover, .spot-box:focus-visible) .k-card-a { transform: translateY(-12px); }
+.scene:has([data-go="tab-box"]:hover, .spot-box:focus-visible) .k-card-b { transform: translateY(-18px); }
+.scene:has([data-go="tab-box"]:hover, .spot-box:focus-visible) .k-card-c { transform: translateY(-8px); }
+.scene:has([data-go="tab-kitchen"]:hover, .spot-kitchen:focus-visible) .k-jar { animation: hop 0.55s var(--ease); }
+.scene:has([data-go="tab-kitchen"]:hover, .spot-kitchen:focus-visible) .k-jar-2 { animation-delay: 60ms; }
+.scene:has([data-go="tab-kitchen"]:hover, .spot-kitchen:focus-visible) .k-jar-3 { animation-delay: 120ms; }
+.scene:has([data-go="tab-kitchen"]:hover, .spot-kitchen:focus-visible) .k-jar-4 { animation-delay: 180ms; }
+.scene:has([data-go="chat"]:hover, .spot-chat:focus-visible) .k-hat-body { animation: swing 0.9s ease-in-out; }
+
+@keyframes lid {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-4px) rotate(-3deg); }
+  70% { transform: translateY(-3px) rotate(2.5deg); }
+}
+
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-7px); }
+}
+
+@keyframes swing {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(9deg); }
+  60% { transform: rotate(-6deg); }
+  85% { transform: rotate(2deg); }
+}
+
+/* The labels: small paper tags pinned to each object. */
+.spot {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.5em 0.95em;
+  border-radius: 999px;
+  border: 1px solid var(--rule-strong);
+  background: var(--card);
+  color: var(--ink);
+  font: 600 clamp(0.62rem, 0.42rem + 0.62vw, 0.95rem) / 1 var(--font-ui);
+  white-space: nowrap;
+  box-shadow: 0 8px 18px -10px rgb(43 33 27 / 0.55);
+  transition:
+    transform 200ms var(--ease),
+    border-color 200ms var(--ease),
+    background-color 200ms var(--ease);
+}
+
+.spot::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.spot:hover,
+.spot:focus-visible {
+  transform: translate(-50%, calc(-50% - 3px));
+  border-color: var(--accent);
+  background: var(--card);
+}
+
+.spot-shopping { --x: 13.2%; --y: 80%; }
+.spot-kitchen { --x: 83.3%; --y: 56%; }
+.spot-recipes { --x: 50%; --y: 79%; }
+.spot-box { --x: 68.3%; --y: 66.5%; }
+.spot-chat { --x: 27.5%; --y: 40.5%; }
+
 /* Motion: new things settle in; nothing moves for people who prefer it still. */
 
 @keyframes rise {
@@ -1517,6 +1884,30 @@ dialog h2 {
 
   .tabs {
     padding-top: var(--space-2);
+  }
+
+  /* On a phone the kitchen stays full size as a panorama to swipe across, opening on the stove. */
+  .home {
+    padding: var(--space-2) var(--space-4) var(--space-6);
+  }
+
+  .home-hint {
+    display: block;
+    font-size: 0.85rem;
+  }
+
+  .scene-frame {
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+
+  .scene {
+    width: 780px;
+  }
+
+  .spot {
+    font-size: 0.78rem;
   }
 
   .account {

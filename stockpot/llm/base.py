@@ -1,4 +1,5 @@
-"""What every LLM backend can do. Each method sees the real pantry and answers in Stockpot's own shapes."""
+"""What every LLM backend can do. Each method about the existing kitchen sees the real pantry, and every method
+answers in Stockpot's own shapes."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator

@@ -51,6 +51,8 @@ def singular(word: str) -> str:
         word = word[:-1]
     if word.endswith("ie") and len(word) > 3:
         return word[:-1]
+    if word.endswith("che"):
+        return word[:-1]
     if word.endswith("y") and len(word) > 2 and word[-2] not in "aeiou":
         return word[:-1] + "i"
     return word
@@ -61,7 +63,7 @@ def food_key(name: str) -> str:
     words = [word.strip(".,;:!?'\"()") for word in name.lower().split()]
     words = [word for word in words if word]
     if not words:
-        return ""
+        return " ".join(name.lower().split())
     return " ".join([*words[:-1], singular(words[-1])])
 
 
@@ -144,10 +146,11 @@ def get_item(item_id: RowId, user: CurrentUser, conn: Conn, today: Today) -> dic
 
 @router.patch("/{item_id}")
 def edit_item(item_id: RowId, body: ItemPatch, user: CurrentUser, conn: Conn, today: Today) -> dict:
-    """Changes only the fields sent. A new name may not be the name of another item: each food is kept once."""
+    """Changes only the fields sent. Renaming an item to a different food that is already in the pantry is
+    refused, since each food is kept once; an item keeping its own food can always be edited."""
+    current = found(conn, user.id, item_id)
     changes = body.changes()
-    if "name" in changes:
-        key = food_key(changes["name"])
+    if "name" in changes and (key := food_key(changes["name"])) != food_key(current["name"]):
         for other in rows(conn, user.id):
             if other["id"] != item_id and food_key(other["name"]) == key:
                 raise HTTPException(409, f"{other['name']} is already in your pantry. Edit that one instead.")

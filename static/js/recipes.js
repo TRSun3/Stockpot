@@ -3,7 +3,7 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { minutes } from "./format.js";
-import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js";
+import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, reportError, toast } from "./ui.js";
 
 const PREFERENCES_LIMIT = 300;
 const fetchBox = latestOnly(() => api("GET", "/api/recipes/saved"));
@@ -67,8 +67,12 @@ export async function loadBox() {
     );
     show($("#box-empty"), saved.length === 0);
   } catch (error) {
-    toast(error.message, "error");
+    reportError(error);
   }
+}
+
+export function savedCount() {
+  return savedRecipes.size;
 }
 
 export function resetRecipes() {

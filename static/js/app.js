@@ -2,13 +2,14 @@
 
 import { api } from "./api.js";
 import { initAuth, showAuthMessage } from "./auth.js";
-import { initChat, loadChat, resetChat } from "./chat.js";
+import { initChat, loadChat, openChat, resetChat } from "./chat.js";
 import { $, show } from "./dom.js";
+import { centerKitchen, initHome, renderHome, resetHome } from "./home.js";
 import { initNotes } from "./notes.js";
 import { initPantry, loadPantry, resetPantry } from "./pantry.js";
 import { initRecipes, loadBox, resetRecipes, suggestFor } from "./recipes.js";
 import { initShopping, loadShopping, resetShopping } from "./shopping.js";
-import { busy, toast } from "./ui.js";
+import { busy, reportError } from "./ui.js";
 
 const TAB_KEY = "stockpot.tab";
 const THEME_KEY = "stockpot.theme";
@@ -95,27 +96,76 @@ function initTabs() {
   selectTab(remembered && remembered.getAttribute("role") === "tab" ? remembered : tabs[0]);
 }
 
+// Who is logged in, or null on the login screen.
+let current = null;
+
+// The address decides the view: "#home" is the kitchen home, anything else the app. The pot links to "#home",
+// so the browser's Back button returns from a tab to the kitchen.
+function route() {
+  if (!current) return;
+  const home = location.hash === "#home";
+  const switching = home !== !$("#home-view").hidden;
+  show($("#home-view"), home);
+  show($("#app-view"), !home);
+  if (home) renderHome(current.username);
+  if (!switching) return;
+  // Moving between the kitchen home and the app puts keyboard focus at the start of the new view.
+  if (home) {
+    centerKitchen();
+    $("#home-view").focus({ preventScroll: true });
+  } else {
+    document.querySelector("[role=tab][aria-selected=true]")?.focus();
+  }
+}
+
+// The skip link goes to whichever view is showing, without changing the address that chooses it.
+function initSkipLink() {
+  $(".skip-link").addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!$("#home-view").hidden) $("#home-view").focus();
+    else if (!$("#app-view").hidden) $("#app-view").focus();
+    else $("#auth-form [name=username]").focus();
+  });
+}
+
+// Leaves the kitchen home for one part of the app: a tab's id, or "chat".
+function goTo(target) {
+  history.pushState(null, "", location.pathname + location.search);
+  route();
+  if (target === "chat") {
+    openChat();
+    return;
+  }
+  selectTab(document.getElementById(target), { focus: true });
+  window.scrollTo({ top: 0 });
+}
+
 async function enter(me) {
+  current = me;
   $("#username").textContent = me.username;
   $("#avatar").textContent = me.username.slice(0, 1);
   show($("#mock-badge"), me.llm === "mock");
   show($("#account"), true);
   show($("#auth-view"), false);
-  show($("#app-view"), true);
-  document.querySelector("[role=tab][aria-selected=true]")?.focus();
+  route();
+  if (!$("#app-view").hidden) document.querySelector("[role=tab][aria-selected=true]")?.focus();
   await Promise.all([loadPantry(), loadShopping(), loadBox(), loadChat()]);
+  route();
 }
 
 // Shows the login screen and clears everything the last account left on the page.
 function leave(message = "") {
+  current = null;
   if ($("#notes-dialog").open) $("#notes-dialog").close();
   show($("#account"), false);
   show($("#app-view"), false);
+  show($("#home-view"), false);
   show($("#auth-view"), true);
   resetPantry();
   resetShopping();
   resetRecipes();
   resetChat();
+  resetHome();
   for (const form of document.querySelectorAll("#app-view form")) form.reset();
   for (const id of ["#adjust-result", "#move-result"]) $(id).replaceChildren();
   $("#toasts").replaceChildren();
@@ -126,7 +176,7 @@ function leave(message = "") {
 async function start() {
   // A last resort: every action handles its own errors, but anything missed still gets a readable message.
   window.addEventListener("unhandledrejection", (event) => {
-    toast(event.reason?.message || "Something went wrong. Please try again.", "error");
+    reportError(event.reason);
   });
   initTheme();
   trackMasthead();
@@ -151,8 +201,12 @@ async function start() {
     })
   );
 
+  initHome({ onGo: goTo });
+  initSkipLink();
+  window.addEventListener("hashchange", route);
+
   document.addEventListener("auth:lost", () => {
-    if (!$("#app-view").hidden) leave("Your session ended. Please log in again.");
+    if (current) leave("Your session ended. Please log in again.");
   });
 
   try {

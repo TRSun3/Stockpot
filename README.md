@@ -37,6 +37,7 @@ Put a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 - **Recipes:** suggestions built from what you have and what's about to expire, "Can I make carbonara?", and tweaks like "make it vegetarian". Add what's missing to the shopping list, save recipes to a recipe box, and press "I cooked this" to update the pantry.
 - **Chat:** tell the cook how you feel ("long day, want something cozy") and get ideas built on your kitchen.
 - **Kitchen notes:** diets, allergies, and equipment the cook always keeps in mind.
+- **Kitchen home:** click the pot for an animated kitchen. The note on the fridge is your shopping list, and the fridge, shelves, stove, recipe box, and chef hat each open their part of the app.
 
 ## Testing
 

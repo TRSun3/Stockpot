@@ -36,7 +36,7 @@ An item comes back as `{id, name, description, expires_on, status, days_left, up
 
 Names are 1 to 80 characters and descriptions up to 500. An item that belongs to another account answers 404, the same as one that doesn't exist.
 
-The pantry holds each food once. Names match ignoring case, spacing, punctuation, and plurals, so "Eggs", "egg", and "Peaches" and "peach" are the same food. Adding a food that is already there, by hand, from text, or from the shopping list, joins it to the existing item: the LLM rewrites the description to cover both ("6 left" and "a dozen" become "18 left"), and the item keeps the sooner expiry. Several of one new food in a single request become one item. If the item is edited or removed while the LLM is still merging, the edit is kept, with what was bought joined on, and a removed item comes back as just what was bought. Renaming an item to another item's food is refused with 409.
+The pantry holds each food once. Names match ignoring case, spacing, punctuation around words, and plurals, so "Eggs", "egg", and "Peaches" and "peach" are the same food. Adding a food that is already there, by hand, from text, or from the shopping list, joins it to the existing item: the LLM rewrites the description to cover both ("6 left" and "a dozen" become "18 left"), and the item keeps the sooner expiry. Several of one new food in a single request become one item. If the item is edited or removed while the LLM is still merging, the edit is kept, with what was bought joined on, and a removed item comes back as just what was bought. A food that another request adds meanwhile, from a second tab or a double submit, is joined the same way rather than added twice. Renaming an item to another item's food is refused with 409.
 
 ### In Plain Words
 
@@ -65,13 +65,13 @@ An entry comes back as `{id, name, note, checked}`.
 
 | Method | Path | Does |
 |---|---|---|
-| POST | `/api/recipes/suggest` | `{preferences?}` like "something quick" returns `{recipes}`: at most four, built mostly from the pantry, favoring what expires soonest |
+| POST | `/api/recipes/suggest` | `{preferences?}` like "something quick" returns `{recipes}`: three from Gemini and never more than four, built mostly from the pantry, favoring what expires soonest |
 | POST | `/api/recipes/plan` | `{dish}` like "carbonara" returns `{recipe}`, with what the pantry covers in `uses` and everything else in `missing` |
 | POST | `/api/recipes/tweak` | `{recipe, feedback}` like "make it vegetarian" returns the revised `{recipe}`. 422 for a recipe with no title or steps |
-| POST | `/api/recipes/cooked` | `{recipe}` updates the pantry for what the recipe used and returns `{changes, rejected}`. 404 when none of its items are in this pantry |
-| POST | `/api/recipes/missing-to-shopping` | `{names, recipe_title?}` adds each name to the shopping list unless it's already waiting there. Returns `{added, skipped}` |
+| POST | `/api/recipes/cooked` | `{recipe}` updates the pantry for what the recipe used and returns `{changes, rejected}`. 422 for a recipe with no title or steps, 404 when none of its items are in this pantry |
+| POST | `/api/recipes/missing-to-shopping` | `{names, recipe_title?}`, at most 20 names, adds each to the shopping list unless an unchecked entry of that name, in any case, is already waiting there. Returns `{added, skipped}` |
 | GET | `/api/recipes/saved` | The recipe box, newest first, as `[{id, recipe, saved_at}]` |
-| POST | `/api/recipes/saved` | `{recipe}` saves a recipe (201) |
+| POST | `/api/recipes/saved` | `{recipe}` saves a recipe and returns `{id, recipe}` (201). 422 for a recipe with no title or steps |
 | DELETE | `/api/recipes/saved/{id}` | Removes a saved recipe |
 
 A recipe is `{title, summary, time_minutes, uses: [{item_id, name, amount}], missing, steps, why}`. Every recipe the API returns has been checked: `uses` only names items in this user's pantry, by their real names. Cooking only ever changes the items in the recipe's `uses`.
@@ -89,7 +89,7 @@ Notes are free text like "vegetarian, allergic to peanuts, no oven, cooking for 
 
 | Method | Path | Does |
 |---|---|---|
-| GET | `/api/chat` | The conversation, oldest first, as `[{id, role, content, created_at}]` |
+| GET | `/api/chat` | The latest 200 messages of the conversation, oldest first, as `[{id, role, content, created_at}]` |
 | POST | `/api/chat` | `{message}` streams the reply as server-sent events |
 | DELETE | `/api/chat` | Clears the conversation |
 

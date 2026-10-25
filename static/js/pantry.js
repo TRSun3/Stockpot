@@ -3,7 +3,7 @@
 import { api } from "./api.js";
 import { el, $, show } from "./dom.js";
 import { freshnessLabel } from "./format.js";
-import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, toast } from "./ui.js";
+import { busy, changeSummary, emit, keepFocus, latestOnly, on, onSubmit, reportError, toast } from "./ui.js";
 
 let items = [];
 let loaded = false;
@@ -163,8 +163,14 @@ export async function loadPantry() {
     if (editing && !items.some((item) => item.id === editing.id)) editing = null;
     keepFocus(render);
   } catch (error) {
-    toast(error.message, "error");
+    reportError(error);
   }
+}
+
+// How full the pantry is and how much of it to use soon, for the kitchen home's greeting.
+export function pantryCounts() {
+  const soon = items.filter((item) => item.days_left !== null && item.days_left <= 3).length;
+  return { total: items.length, soon };
 }
 
 export function resetPantry() {

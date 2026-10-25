@@ -1,5 +1,6 @@
 """A deterministic stand-in for Gemini: plausible answers from hand-written rules, the same every time."""
 
+import functools
 import re
 import time
 from collections.abc import Iterator
@@ -127,7 +128,7 @@ def pieces(text: str) -> list[str]:
 
 def has_word(text: str, word: str) -> bool:
     """Whether `word` starts a word in `text`, so "tea" is not found in "steak"."""
-    return re.search(rf"\b{re.escape(word)}", text) is not None
+    return starts_word(word).search(text) is not None
 
 
 def shelf_life(text: str) -> int | None:
@@ -153,6 +154,19 @@ def name_of(phrase: str) -> str:
         words.pop(0)
     name = " ".join(words) or phrase
     return name[:1].upper() + name[1:]
+
+
+# Patterns built from words are compiled once: matching every item's words against every clause would otherwise
+# outgrow the re module's small cache on a large pantry and recompile on every search.
+@functools.lru_cache(maxsize=8192)
+def starts_word(word: str) -> re.Pattern:
+    return re.compile(rf"\b{re.escape(word)}")
+
+
+@functools.lru_cache(maxsize=8192)
+def whole_word(word: str) -> re.Pattern:
+    """A word on its own, singular or plural: "egg" matches "eggs" but not "eggplant"."""
+    return re.compile(rf"\b{re.escape(word)}(?:s|es)?\b")
 
 
 def leading_count(text: str) -> tuple[int, str] | None:
@@ -197,7 +211,7 @@ def counted(left: int, noun: str) -> str:
 
 def is_food(name: str, word: str) -> bool:
     """Whether an item's name is that food, as a whole word, singular or plural: "egg" isn't "Eggplant"."""
-    return re.search(rf"\b{re.escape(word)}(?:s|es)?\b", name) is not None
+    return whole_word(word).search(name) is not None
 
 
 def mentions(text: str, item: PantryItem) -> int:
@@ -206,7 +220,7 @@ def mentions(text: str, item: PantryItem) -> int:
 
     def said(word: str) -> bool:
         word = word.rstrip("s")
-        return len(word) > 2 and re.search(rf"\b{re.escape(word)}(?:s|es)?\b", lowered) is not None
+        return len(word) > 2 and whole_word(word).search(lowered) is not None
 
     name = re.sub(r"[^a-z0-9 ]", " ", item.name.lower()).strip()
     if said(name):
@@ -837,7 +851,7 @@ class Mock(LLM):
         lowered = dish.lower()
         for recipe in LIBRARY:
             names = (recipe.title.lower(), *recipe.aliases)
-            if any(re.search(rf"\b{re.escape(name)}(?:s|es)?\b", lowered) for name in names):
+            if any(whole_word(name).search(lowered) for name in names):
                 built, _ = self.build(recipe, pantry, today, avoided(notes))
                 if built.missing:
                     built.why = f"You'd need to pick up {join(built.missing)}."
