@@ -19,6 +19,7 @@ The look is a cookbook rather than an app: parchment paper, espresso ink, and a 
 - **Pages:** Use Soon is a shelf of cards, the pantry a ruled ledger, the shopping list a checklist, and recipes cookbook pages with a one-line reason they fit, ingredients split into what you have and what you'd buy, and numbered steps.
 - **Motion:** only newly added items, recipes, messages, and toasts settle in, in 180 ms and all at once rather than one after another, and the streaming reply shows a blinking caret. With `prefers-reduced-motion`, nothing moves.
 - **Dark mode:** follows the system, and the moon/sun button in the masthead overrides it. The choice is remembered and applied before the first paint.
+- **Frozen header:** the masthead and the tabs stay at the top while the page scrolls, and the chat panel sticks just below the masthead. `app.js` measures the masthead into `--masthead-height`, which also keeps anything scrolled into view clear of the header. Below 760px, where the masthead wraps onto two rows, only the tabs stay.
 - **Narrow windows:** below 1080px the chat moves under the tabs; below 760px everything stacks and the shelf shows two cards across. The browser tests check that nothing scrolls sideways at phone width.
 
 ## Modules

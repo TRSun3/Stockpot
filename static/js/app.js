@@ -37,6 +37,19 @@ function initTheme() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", labelThemeToggle);
 }
 
+// Keeps --masthead-height equal to the frozen masthead's height, so the tabs and chat stick just below it.
+// On phones the masthead isn't frozen, so it counts as 0.
+function trackMasthead() {
+  const masthead = $(".masthead");
+  const update = () => {
+    const frozen = getComputedStyle(masthead).position === "sticky";
+    document.documentElement.style.setProperty("--masthead-height", `${frozen ? masthead.offsetHeight : 0}px`);
+  };
+  new ResizeObserver(update).observe(masthead);
+  matchMedia("(max-width: 760px)").addEventListener("change", update);
+  update();
+}
+
 // Enter submits the plain-words boxes, like the chat; Shift+Enter still adds a line.
 function enterSubmits(form) {
   form.querySelector("textarea").addEventListener("keydown", (event) => {
@@ -116,6 +129,7 @@ async function start() {
     toast(event.reason?.message || "Something went wrong. Please try again.", "error");
   });
   initTheme();
+  trackMasthead();
   initTabs();
   enterSubmits($("#adjust-form"));
   initAuth({ onEnter: enter });

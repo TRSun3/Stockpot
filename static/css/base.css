@@ -122,6 +122,8 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Anything scrolled into view stops below the frozen masthead and tabs. */
+  scroll-padding-top: calc(var(--masthead-height, 0px) + 4rem);
 }
 
 body {
@@ -202,7 +204,7 @@ svg {
   position: absolute;
   left: var(--space-4);
   top: -3rem;
-  z-index: 20;
+  z-index: 25;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-s);
   background: var(--ink);
@@ -412,6 +414,7 @@ input[type="date"] {
 
 /* Masthead */
 
+/* The masthead and the tabs stay at the top while the page scrolls; `--masthead-height` is measured by app.js. */
 .masthead {
   display: flex;
   align-items: center;
@@ -419,6 +422,13 @@ input[type="date"] {
   max-width: var(--page-width);
   margin: 0 auto;
   padding: var(--space-5) var(--space-6) var(--space-4);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--paper);
+  /* The background runs the full width of the window, past the masthead's own max-width. */
+  box-shadow: 0 0 0 100vmax var(--paper);
+  clip-path: inset(0 -100vmax);
 }
 
 .brand {
@@ -565,6 +575,10 @@ input[type="date"] {
   margin-bottom: var(--space-6);
   overflow-x: auto;
   scrollbar-width: none;
+  position: sticky;
+  top: var(--masthead-height, 0px);
+  z-index: 15;
+  background: var(--paper);
 }
 
 .tabs [role="tab"] {
@@ -1199,10 +1213,11 @@ input[type="date"] {
 
 .chat {
   position: sticky;
-  top: var(--space-5);
+  top: var(--masthead-height, var(--space-5));
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 7.5rem);
+  /* Short enough to fit above the page's bottom padding, so the end of the page never pushes it under the masthead. */
+  height: calc(100vh - var(--masthead-height, 5rem) - var(--space-7));
   min-height: 28rem;
   background: var(--card);
   border: 1px solid var(--rule);
@@ -1493,9 +1508,15 @@ dialog h2 {
 }
 
 @media (max-width: 760px) {
+  /* On phones the wrapped masthead would take too much of the screen, so only the tabs stay at the top. */
   .masthead {
     flex-wrap: wrap;
     padding: var(--space-4);
+    position: static;
+  }
+
+  .tabs {
+    padding-top: var(--space-2);
   }
 
   .account {

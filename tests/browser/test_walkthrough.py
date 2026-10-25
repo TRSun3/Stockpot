@@ -350,6 +350,26 @@ def test_text_from_users_and_the_ai_is_shown_as_text_never_run_as_html(window):
     assert page.title() == "Stockpot"
 
 
+def test_the_masthead_and_tabs_stay_at_the_top_while_the_page_scrolls(window, browser, server):
+    page = window
+    log_in(page, "neal")
+    page.mouse.wheel(0, 5000)
+    page.wait_for_function("() => window.scrollY > 400")
+    masthead = page.locator(".masthead").bounding_box()
+    assert masthead["y"] == 0
+    assert abs(page.locator(".tabs").bounding_box()["y"] - masthead["height"]) <= 1
+    assert abs(page.locator("#chat-panel").bounding_box()["y"] - masthead["height"]) <= 1
+    expect(page.get_by_role("tab", name="Recipes")).to_be_in_viewport()
+
+    phone = browser.new_context(base_url=server, viewport={"width": 390, "height": 844}).new_page()
+    log_in(phone, "tianyue")
+    phone.mouse.wheel(0, 3000)
+    phone.wait_for_function("() => window.scrollY > 400")
+    assert phone.locator(".tabs").bounding_box()["y"] == 0
+    expect(phone.locator(".masthead")).not_to_be_in_viewport()
+    phone.context.close()
+
+
 def test_the_kitchen_fits_a_phone_width_window_without_sideways_scrolling(browser, server):
     context = browser.new_context(base_url=server, viewport={"width": 390, "height": 844})
     page = context.new_page()
