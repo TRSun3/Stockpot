@@ -64,7 +64,7 @@ def recipe_json(recipe: Recipe) -> str:
 
 ID_RULE = (
     "Only refer to pantry items by the exact item_id shown in brackets. Never invent an item_id, and never "
-    "refer to an item that is not listed."
+    "refer to an item that is not listed. Item ids belong only in item_id fields, never in any text."
 )
 
 RECIPE_RULES = f"""\
@@ -74,27 +74,47 @@ Recipe fields:
 - time_minutes: realistic total time as a whole number.
 - uses: every pantry item the recipe uses, as item_id, the item's name, and the amount used \
 (for example "3 eggs" or "a big handful").
-- missing: ingredients the recipe needs that are not in the pantry. Assume the user has {STAPLES}; \
-never list those.
-- steps: clear, numbered-free instructions, one action per step, 4 to 8 steps.
+- missing: ingredients the recipe needs that are not in the pantry. Anything not in the pantry goes \
+here, never in `uses`. Assume the user has {STAPLES}; never list those anywhere.
+- steps: 4 to 6 short, clear instructions without numbers, one action each.
 - why: one short sentence on why this suits the user now, naming items that expire soon when they apply \
 (for example "Uses your spinach before it turns tomorrow").
-Never use an item marked EXPIRED. {ID_RULE}"""
+Never use an item marked EXPIRED. {ID_RULE} If no pantry item fits a field, leave that list empty; \
+never write placeholders like "none".
+
+Answer with JSON only. One recipe looks exactly like this (the values are only an example):
+{{"title": "Spinach and Cheddar Omelette", "summary": "A soft, folded omelette with wilted spinach.", \
+"time_minutes": 10, "uses": [{{"item_id": 12, "name": "Eggs", "amount": "3 eggs"}}, \
+{{"item_id": 11, "name": "Spinach", "amount": "a big handful"}}], "missing": ["chives"], \
+"steps": ["Whisk the eggs with a pinch of salt.", "Wilt the spinach in a buttered pan.", \
+"Pour in the eggs and fold once set."], "why": "Uses your spinach before it turns tomorrow."}}"""
+
+OPS_SHAPE = """Answer with JSON only, as {"ops": [...]}, for example \
+{"ops": [{"op": "update", "item_id": 19, "description": "about a quarter gallon of 2% milk"}, \
+{"op": "delete", "item_id": 11}]}. Use {"ops": []} when nothing changes."""
 
 
 def parse_items(text: str, today: date) -> tuple[str, str]:
+    example_date = date.fromordinal(today.toordinal() + 28).isoformat()
     system = f"""{PERSONA}
 Today is {today.isoformat()}.
 The user is telling you about groceries they now have. Turn what they wrote into pantry items.
-- name: a short display name with a capital first letter, like "Milk", "Chicken thighs", or "Spinach".
-- description: everything else they said about it, in plain words: the amount, size, brand, state, or \
-notes (for example "a dozen large eggs" or "about half a gallon of 2% milk"). Keep every quantity they \
-gave. Use an empty string when they said nothing beyond the name.
-- expires_on: your best estimate of when it goes bad, as YYYY-MM-DD, from typical refrigerated shelf \
-life starting today. Use null for shelf-stable goods: dry pasta, rice, flour, sugar, salt, oils, \
-vinegar, spices, canned or jarred goods, and the like. Frozen food lasts about 3 months.
-One item per distinct food. Ignore anything that is not food or drink. Return an empty list when \
-there is no food at all."""
+- name: just the food, short, with a capital first letter, like "Milk", "Chicken thighs", or "Spinach". \
+Never put amounts, notes, or parentheses in the name.
+- description: everything else they said about it, in their words: the amount, size, brand, state, or \
+notes, including anything in parentheses (for example "a dozen large eggs" or "2%"). Keep every quantity \
+they gave. Use an empty string when they said nothing beyond the name.
+- expires_on: when it typically goes bad, as YYYY-MM-DD counted from today ({today.isoformat()}), \
+assuming it is stored the usual way. Every fresh food gets a date. Typical keeping times: fresh fish \
+and chicken 1 to 2 days, ground meat 2 days, other raw meat 3 to 5 days, leafy greens and berries 4 to \
+6 days, bananas and avocados 4 to 6 days, bread 5 days, milk 7 days, most vegetables 5 to 14 days, \
+yogurt 2 weeks, hard cheese 3 to 4 weeks, eggs 3 to 5 weeks, apples, onions, and potatoes about a month. \
+Use null only for shelf-stable goods: dry pasta, rice, flour, sugar, salt, oils, vinegar, spices, and \
+canned or jarred goods. Frozen food lasts about 3 months.
+One item per distinct food. Ignore anything that is not food or drink.
+Answer with JSON only, as {{"items": [...]}}, for example {{"items": [{{"name": "Eggs", "description": \
+"a dozen", "expires_on": "{example_date}"}}, {{"name": "Rice", "description": "a bag", "expires_on": null}}]}}. \
+Use {{"items": []}} when there is no food at all."""
     return system, text
 
 
@@ -103,10 +123,11 @@ def suggest_recipes(pantry: list[PantryItem], today: date, preferences: str, not
 {pantry_block(pantry, today)}
 {notes_block(notes)}
 
-Suggest up to 4 recipes the user could cook now, built mostly from this pantry. Favor items that \
+Suggest 3 different recipes the user could cook now, built mostly from this pantry. Favor items that \
 expire soonest so nothing goes to waste, and keep `missing` to 2 or fewer ingredients for each recipe. \
-Order them best first. If the pantry is empty, return an empty list.
-{RECIPE_RULES}"""
+Order them best first. If the pantry is empty, return no recipes.
+{RECIPE_RULES}
+Wrap the recipes as {{"recipes": [...]}}."""
     user = f"What they're in the mood for: {preferences}" if preferences else "Suggest what to cook."
     return system, user
 
@@ -149,7 +170,8 @@ Return one operation per pantry item the recipe used, and only for items in the 
 - {{"op": "update", "item_id": N, "description": "..."}} when some is left. Rewrite the whole \
 description to say what remains, keeping useful details like brand or type (for example \
 "about half a gallon of 2% milk" becomes "about a quarter gallon of 2% milk").
-Never touch items the recipe did not use, and never add items. {ID_RULE}"""
+Never touch items the recipe did not use, and never add items. {ID_RULE}
+{OPS_SHAPE}"""
     return system, f"I cooked this:\n{recipe_json(recipe)}"
 
 
@@ -161,11 +183,13 @@ The user describes a change to their pantry in their own words. Return the opera
 pantry match what they said, and nothing more:
 - {{"op": "update", "item_id": N, "description": "..."}} to rewrite an item's description, for \
 example after using some of it or finding more. Rewrite the whole description. Add \
-"expires_on": "YYYY-MM-DD" only when the expiry changes, such as after freezing something.
+"expires_on": "YYYY-MM-DD" only when the expiry changes: frozen food keeps about 3 months from today, \
+and thawed food 1 to 2 days.
 - {{"op": "delete", "item_id": N}} when an item is used up, thrown out, or gone bad.
 - {{"op": "add", "name": "...", "description": "...", "expires_on": "YYYY-MM-DD" or null}} for food \
 they now have that is not in the pantry yet.
-Return an empty list if they did not describe a change. {ID_RULE}"""
+Return no operations if they did not describe a change. {ID_RULE}
+{OPS_SHAPE}"""
     return system, instruction
 
 

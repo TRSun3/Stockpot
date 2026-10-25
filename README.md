@@ -26,7 +26,7 @@ The seed creates two demo accounts with different, lived-in kitchens. Running it
 
 Log in as one in a normal window and the other in a private window to see two separate kitchens side by side.
 
-Without a `GEMINI_API_KEY` in `.env`, Stockpot runs on a built-in mock AI so everything works offline, and the page shows a "Mock AI" badge. To use Gemini, set `STOCKPOT_LLM=gemini` and `GEMINI_API_KEY` in `.env` and restart.
+Put a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) after `GEMINI_API_KEY=` in `.env` and restart. The free tier is enough, and with no billing set up it is never charged: past its limits the API refuses requests until the limit resets, and Stockpot says so. Without a key, or with `STOCKPOT_LLM=mock`, Stockpot runs on a built-in mock AI so everything works offline, and the page shows a "Mock AI" badge.
 
 ## What It Does
 

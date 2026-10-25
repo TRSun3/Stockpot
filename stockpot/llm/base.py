@@ -9,8 +9,23 @@ from stockpot.schemas import ChatTurn, PantryItem, PantryOp, ParsedItem, Recipe,
 UNAVAILABLE = "The AI cook couldn't answer just now. Nothing was changed; please try again in a moment."
 
 
+BUSY = "Stockpot's AI is at its free-tier request limit for the moment. Give it a minute and try again."
+
+
 class LLMError(Exception):
     """The backend failed or answered with something unusable. The message is safe to log."""
+
+    @property
+    def friendly(self) -> str:
+        return UNAVAILABLE
+
+
+class LLMBusy(LLMError):
+    """The backend refused because of a rate limit or quota; waiting fixes it."""
+
+    @property
+    def friendly(self) -> str:
+        return BUSY
 
 
 class LLM(ABC):

@@ -7,7 +7,7 @@ from conftest import TODAY
 from google.genai import errors
 
 from stockpot import config
-from stockpot.llm import LLMError, get_llm
+from stockpot.llm import LLMBusy, LLMError, get_llm
 from stockpot.llm.gemini import Gemini
 from stockpot.llm.mock import Mock
 from stockpot.schemas import ChatTurn, PantryItem, ParsedItems, Recipes
@@ -91,3 +91,13 @@ def test_the_backend_is_gemini_only_with_a_key():
     base = config.Settings(db_path=TODAY, llm="gemini", gemini_api_key="", gemini_model="m")
     assert isinstance(get_llm(base), Mock)
     assert isinstance(get_llm(base.__class__(**{**base.__dict__, "gemini_api_key": "k"})), Gemini)
+
+
+def test_a_rate_limit_is_reported_as_busy_so_the_user_knows_to_wait():
+    limited = errors.APIError(429, {"error": {"message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+    llm, _ = gemini(error=limited)
+    with pytest.raises(LLMBusy):
+        llm.parse_items("milk", TODAY)
+    llm, _ = gemini(chunks=[limited])
+    with pytest.raises(LLMBusy):
+        list(llm.chat([], "hi", PANTRY, [], TODAY))

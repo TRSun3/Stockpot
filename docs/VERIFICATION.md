@@ -73,6 +73,22 @@ Every required test and rule checked out. The gaps were small and are fixed: err
 
 `uv run python -m evals.run_evals` on the mock: 23 of 23 scenarios pass. The first run caught a real mock bug: the bean quesadilla, tagged vegetarian, accepted chicken in place of beans, so vegetarian requests could still get chicken. See [EVALS.md](EVALS.md) for what each scenario checks.
 
+## Real Gemini, 2026-10-24
+
+With a free-tier key, three models were measured and run through the evals:
+
+| Model | Evals | Suggest recipes | Other AI actions | Chat |
+|---|---|---|---|---|
+| `gemini-3.8-flash` | not run | 43 to 48 s per request | | |
+| `gemma-4-26b-a4b-it` | 23 of 23, after model-specific workarounds | 12 to 20 s | 1 to 9 s | about 2 s |
+| `gemini-3.5-flash-lite` | 23 of 23 | about 3 s | 1 to 2 s | under 1 s to first words |
+
+Stockpot uses `gemini-3.5-flash-lite`. Tuning along the way, kept because it helps any model: every structured prompt now shows the exact JSON shape, the grocery prompt lists typical keeping times and keeps amounts out of names, the pantry-change prompt says how long frozen and thawed food keeps, and item ids may only appear in id fields.
+
+A first Gemini benchmark fired about fifteen AI requests in under a minute and the chats came back rate-limited (429). Two fixes followed: the app now tells the user the free-tier limit was hit and to wait a minute, rather than a generic error, and the benchmark paces its AI calls. The paced run is recorded below.
+
+The demo script was then walked in Edge against a live server on `gemini-3.5-flash-lite`, with no page errors and no Mock AI badge: adding groceries from a sentence (1.9 s), a plain-words update (1.5 s), three cozy suggestions favoring what expires soonest (3.0 s), "can I make carbonara" with bacon or pancetta added to the shopping list (1.5 s), tweaking it vegetarian (1.4 s), "I cooked this" (2.0 s), and the chat (1.2 s), then tianyue's separate kitchen in a second window. With a deliberately wrong key, adding groceries and chatting both showed the friendly error, and the server kept running.
+
 ## Benchmarks
 
 The first run showed every write at about 31 ms against about 5 ms for a read. SQLite itself took under a millisecond for the write; the time went into opening the database file, which costs about 20 ms on Windows right after another connection has written to it (most likely the antivirus rescanning the changed file). Each request used to open its own connection, so every write paid that. Requests now borrow connections from a small pool kept open for the app's lifetime (`db.Pool`). Writes dropped to about 3 ms, and the two-user run from 9.7 s to 2.2 s. `synchronous = NORMAL`, safe under WAL, is on as well but was not the cause.
@@ -136,3 +152,32 @@ Live uvicorn server on 127.0.0.1, 60 runs per core route. Milliseconds.
 | AI | chat: whole reply | 2196.8 | 2209.4 | 2209.4 |
 
 Two users at once: 200 add-read-remove rounds in 5.80 s, p50 50.2 ms, p95 78.6 ms per round, 0 errors.
+
+### Benchmark, 2026-10-24 21:56, gemini backend
+
+Live uvicorn server on 127.0.0.1, 60 runs per core route. Milliseconds.
+
+| Pantry | Route | p50 | p95 | max |
+|---|---|---:|---:|---:|
+| seeded (17) | list items | 4.0 | 6.2 | 57.6 |
+| seeded (17) | use soon | 3.1 | 3.6 | 4.2 |
+| seeded (17) | shopping list | 2.9 | 3.4 | 6.8 |
+| seeded (17) | add item | 3.7 | 6.4 | 20.2 |
+| seeded (17) | edit item | 3.8 | 5.1 | 5.9 |
+| seeded (17) | remove item | 3.0 | 5.1 | 14.3 |
+| seeded (17) | check off shopping | 2.7 | 3.7 | 5.2 |
+| large (500) | list items | 9.5 | 14.1 | 17.0 |
+| large (500) | use soon | 6.1 | 8.8 | 10.6 |
+| large (500) | shopping list | 2.5 | 4.1 | 5.0 |
+| large (500) | add item | 3.1 | 5.5 | 6.7 |
+| large (500) | edit item | 3.1 | 6.5 | 36.7 |
+| large (500) | remove item | 2.6 | 4.6 | 8.9 |
+| large (500) | check off shopping | 2.8 | 4.6 | 5.7 |
+| AI | add groceries from text | 1134.3 | 1213.7 | 1213.7 |
+| AI | suggest recipes | 2996.1 | 3031.7 | 3031.7 |
+| AI | can I make it | 1363.3 | 1435.0 | 1435.0 |
+| AI | I cooked this | 916.1 | 1034.7 | 1034.7 |
+| AI | chat: first chunk | 697.1 | 945.4 | 945.4 |
+| AI | chat: whole reply | 930.5 | 964.2 | 964.2 |
+
+Two users at once: 200 add-read-remove rounds in 5.87 s, p50 50.9 ms, p95 77.8 ms per round, 0 errors.

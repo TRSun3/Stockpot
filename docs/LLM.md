@@ -4,7 +4,7 @@ Stockpot's AI is Google Gemini, reached through the `google-genai` SDK. Until a 
 
 ## Choosing A Backend
 
-`stockpot.llm.get_llm` picks Gemini when `.env` sets `STOCKPOT_LLM=gemini` and a non-empty `GEMINI_API_KEY`, and the mock otherwise. The model is `GEMINI_MODEL`, `gemini-3.8-flash` by default. The server logs which backend is active at startup, never the key. `GET /api/me` reports it as `llm` so the page can show a "Mock AI" badge.
+`stockpot.llm.get_llm` picks Gemini when `.env` sets `STOCKPOT_LLM=gemini` and a non-empty `GEMINI_API_KEY`, and the mock otherwise. The model is `GEMINI_MODEL`, `gemini-3.5-flash-lite` by default; [DECISIONS.md](DECISIONS.md) says why. The server logs which backend is active at startup, never the key. `GET /api/me` reports it as `llm` so the page can show a "Mock AI" badge.
 
 ## What The LLM Does
 
@@ -33,7 +33,7 @@ Whatever the LLM returns passes through `stockpot/guard.py` before it touches th
 
 The valid changes in a batch are applied together in one transaction, and each refused change is reported with its reason. One bad suggestion never blocks the good ones, and a crash partway through leaves the pantry untouched. The LLM never writes SQL, never sees other tables, and never chooses a `user_id`.
 
-When a Gemini call fails or times out (45 seconds), or answers with something that doesn't parse, the backend raises `LLMError`. The API turns that into a 502 with a friendly message, and nothing is changed.
+When a Gemini call fails or times out (45 seconds), or answers with something that doesn't parse, the backend raises `LLMError`. The API turns that into a 502 with a friendly message, and nothing is changed. A rate limit (429) raises `LLMBusy` instead, which tells the user to give it a minute. Brief server overloads (500, 502, 503) are retried once, and no answer may run past 4096 tokens.
 
 ## Gemini
 

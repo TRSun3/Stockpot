@@ -13,6 +13,6 @@ It builds a throwaway database holding the two demo accounts and a third account
 - **AI routes** on whichever backend `.env` selects: adding groceries from text, suggesting recipes, "can I make it", "I cooked this", and the chat's time to first chunk and to the end of the reply.
 - **Two users at once**: both demo accounts add, list, and remove items in parallel for 100 rounds each. Any error, or either account seeing the other's items, fails the run.
 
-Results are p50, p95, and max in milliseconds. With the mock, the chat's whole-reply time is mostly its deliberate word-by-word pacing (30 ms per word).
+On Gemini, the AI routes run 3 rounds with a 15 s pause between rounds, so the free tier's per-minute request limit is never what gets measured. Results are p50, p95, and max in milliseconds. With the mock, the chat's whole-reply time is mostly its deliberate word-by-word pacing (30 ms per word).
 
 On Windows the server is stopped with `taskkill /T`, because the venv's `python.exe` is a launcher that starts the real interpreter as a child.

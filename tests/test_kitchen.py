@@ -1,6 +1,6 @@
 """Changing the kitchen in plain words: typed groceries, pantry adjustments, and unpacking the shopping."""
 
-from stockpot.llm import LLMError
+from stockpot.llm import BUSY, LLMBusy, LLMError
 from stockpot.llm.mock import Mock
 from stockpot.schemas import PantryOp
 
@@ -129,3 +129,20 @@ def test_moved_shopping_keeps_its_own_names_and_notes_even_when_notes_read_like_
     ]
     assert moved[0]["days_left"] == 5 and moved[2]["expires_on"] is None
     assert neal.get("/api/shopping").json() == []
+
+
+class Limited(Mock):
+    def parse_items(self, text, today):
+        raise LLMBusy("Gemini request failed (429).")
+
+    def chat(self, history, message, pantry, shopping, today, notes=""):
+        raise LLMBusy("Gemini chat failed (429).")
+        yield
+
+
+def test_a_free_tier_limit_says_to_wait_a_minute(app, neal):
+    app.state.llm = Limited(delay=0)
+    response = neal.post("/api/items/parse", json={"text": "eggs"})
+    assert response.status_code == 429
+    assert response.json() == {"error": BUSY}
+    assert BUSY in neal.post("/api/chat", json={"message": "hi"}).text

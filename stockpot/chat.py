@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from stockpot import db, pantry, preferences, shopping
 from stockpot.auth import Conn, CurrentUser
 from stockpot.deps import Model, Today
-from stockpot.llm import UNAVAILABLE, LLMError
+from stockpot.llm import LLMError
 from stockpot.schemas import ChatIn, ChatTurn, ShoppingEntry
 
 HISTORY = 20
@@ -59,8 +59,8 @@ def send(body: ChatIn, request: Request, user: CurrentUser, conn: Conn, today: T
                 for piece in llm.chat(turns, body.message, kitchen, entries, today, notes):
                     pieces.append(piece)
                     yield event({"type": "text", "text": piece})
-            except LLMError:
-                yield event({"type": "error", "error": UNAVAILABLE})
+            except LLMError as error:
+                yield event({"type": "error", "error": error.friendly})
         finally:
             reply = "".join(pieces).strip()
             if reply:

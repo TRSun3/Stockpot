@@ -52,6 +52,7 @@
     },
     {
       "id": "parse-shelf-stable-goods",
+      "stable": true,
       "method": "parse_items",
       "input": {"text": "a bag of rice, two cans of black beans, a box of spaghetti and fresh salmon"},
       "checks": [
@@ -74,12 +75,14 @@
     },
     {
       "id": "parse-nonsense",
+      "stable": true,
       "method": "parse_items",
       "input": {"text": "asdf"},
       "checks": [{"check": "count", "min": 0, "max": 1}, {"check": "valid_items"}]
     },
     {
       "id": "parse-very-long-list",
+      "stable": true,
       "method": "parse_items",
       "input": {"repeat": "eggs, milk, spinach, cheddar, rice, ", "times": 30},
       "checks": [{"check": "count", "min": 5, "max": 150}, {"check": "valid_items"}]
@@ -125,6 +128,7 @@
     },
     {
       "id": "suggest-empty-pantry",
+      "stable": true,
       "method": "suggest_recipes",
       "kitchen": "empty",
       "input": {"preferences": ""},
@@ -132,6 +136,7 @@
     },
     {
       "id": "suggest-single-item",
+      "stable": true,
       "method": "suggest_recipes",
       "kitchen": "single",
       "input": {"preferences": ""},
@@ -139,6 +144,7 @@
     },
     {
       "id": "suggest-no-expiry-pantry",
+      "stable": true,
       "method": "suggest_recipes",
       "kitchen": "pantry_staples",
       "input": {"preferences": ""},
@@ -153,7 +159,7 @@
         {"check": "title_contains", "words": ["carbonara"]},
         {"check": "only_known_ids"},
         {"check": "recipe_uses", "item_ids": [12, 17]},
-        {"check": "missing_includes", "words": ["bacon"]}
+        {"check": "missing_includes", "words": ["bacon|pancetta|guanciale"]}
       ]
     },
     {
@@ -208,6 +214,7 @@
     },
     {
       "id": "cook-uses-everything",
+      "stable": true,
       "method": "apply_cooking",
       "kitchen": "single",
       "input": {
@@ -249,6 +256,7 @@
     },
     {
       "id": "adjust-nothing-changed",
+      "stable": true,
       "method": "adjust_pantry",
       "kitchen": "weeknight",
       "input": {"instruction": "what a lovely day"},
@@ -268,6 +276,7 @@
     },
     {
       "id": "chat-avoids-expired",
+      "stable": true,
       "method": "chat",
       "kitchen": "weeknight",
       "input": {"message": "anything I should use up?"},
@@ -275,6 +284,7 @@
     },
     {
       "id": "chat-empty-pantry",
+      "stable": true,
       "method": "chat",
       "kitchen": "empty",
       "input": {"message": "what can I make tonight?"},

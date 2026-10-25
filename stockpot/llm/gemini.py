@@ -9,7 +9,7 @@ from google.genai import errors, types
 from pydantic import BaseModel, ValidationError
 
 from stockpot.llm import prompts
-from stockpot.llm.base import LLM, LLMError
+from stockpot.llm.base import LLM, LLMBusy, LLMError
 from stockpot.schemas import (
     ChatTurn,
     PantryItem,
@@ -24,8 +24,18 @@ from stockpot.schemas import (
 
 TIMEOUT_MS = 45_000
 CHAT_HISTORY = 20
+# A ceiling on any one answer, far above what three recipes need.
+MAX_OUTPUT_TOKENS = 4096
+# One quiet retry for the brief overloads the free tier sometimes answers with; timeouts are not retried.
+RETRY = types.HttpRetryOptions(attempts=2, initial_delay=1.0, max_delay=3.0, http_status_codes=[500, 502, 503])
 
 log = logging.getLogger("uvicorn.error")
+
+
+def failure(error: errors.APIError, what: str) -> LLMError:
+    """An API error as Stockpot's own: 429 means the free-tier limit, which waiting fixes."""
+    kind = LLMBusy if error.code == 429 else LLMError
+    return kind(f"Gemini {what} failed ({error.code}).")
 
 
 class Gemini(LLM):
@@ -33,7 +43,9 @@ class Gemini(LLM):
 
     def __init__(self, api_key: str, model: str, client=None):
         self.model = model
-        self.client = client or genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
+        self.client = client or genai.Client(
+            api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_MS, retry_options=RETRY)
+        )
 
     def structured[T: BaseModel](self, system: str, user: str, schema: type[T], temperature: float = 0.4) -> T:
         """One request whose answer must parse as `schema`."""
@@ -42,12 +54,13 @@ class Gemini(LLM):
             response_mime_type="application/json",
             response_schema=schema,
             temperature=temperature,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
         )
         try:
             response = self.client.models.generate_content(model=self.model, contents=user, config=config)
         except errors.APIError as error:
             log.warning("Gemini request failed: %s %s", error.code, error.status)
-            raise LLMError(f"Gemini request failed ({error.code}).") from error
+            raise failure(error, "request") from error
         except Exception as error:
             log.warning("Gemini request failed: %s", type(error).__name__)
             raise LLMError("Gemini could not be reached.") from error
@@ -103,7 +116,7 @@ class Gemini(LLM):
                     yield chunk.text
         except errors.APIError as error:
             log.warning("Gemini chat failed: %s %s", error.code, error.status)
-            raise LLMError(f"Gemini chat failed ({error.code}).") from error
+            raise failure(error, "chat") from error
         except Exception as error:
             log.warning("Gemini chat failed: %s", type(error).__name__)
             raise LLMError("Gemini could not be reached.") from error

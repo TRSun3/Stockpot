@@ -45,7 +45,7 @@ Names are 1 to 80 characters and descriptions up to 500. An item that belongs to
 
 `changes` lists what happened, each as `{action: added | updated | removed, item_id, name, description?}`, so the page can say "Updated milk, removed eggs". `rejected` lists every change the LLM proposed that was refused, each with a `reason`. See [LLM.md](LLM.md) for the rules.
 
-When the LLM fails, these routes and the other AI routes answer 502 with a friendly message and change nothing. The chat is the exception: its stream has already begun, so it reports the failure as an `error` event (see [Chat](#chat)).
+When the LLM fails, these routes and the other AI routes answer 502 with a friendly message and change nothing. When the free tier's request limit is reached they answer 429, saying to wait a minute. The chat is the exception: its stream has already begun, so it reports the failure as an `error` event (see [Chat](#chat)).
 
 ## Shopping List
 

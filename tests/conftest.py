@@ -28,7 +28,7 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture
 def settings(tmp_path):
     return config.Settings(
-        db_path=tmp_path / "stockpot.db", llm="mock", gemini_api_key="", gemini_model="gemini-3.8-flash"
+        db_path=tmp_path / "stockpot.db", llm="mock", gemini_api_key="", gemini_model="gemini-3.5-flash-lite"
     )
 
 

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
 from stockpot import auth, chat, config, db, kitchen, pantry, preferences, recipes, shopping
-from stockpot.llm import LLM, UNAVAILABLE, LLMError, get_llm
+from stockpot.llm import LLM, LLMBusy, LLMError, get_llm
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 
@@ -55,7 +55,7 @@ def create_app(settings: config.Settings | None = None, llm: LLM | None = None) 
     @app.exception_handler(LLMError)
     async def llm_error(request: Request, error: LLMError) -> JSONResponse:
         log.warning("LLM call failed: %s", error)
-        return JSONResponse({"error": UNAVAILABLE}, status_code=502)
+        return JSONResponse({"error": error.friendly}, status_code=429 if isinstance(error, LLMBusy) else 502)
 
     @app.exception_handler(Exception)
     async def server_error(request: Request, error: Exception) -> JSONResponse:

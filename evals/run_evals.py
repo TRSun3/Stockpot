@@ -2,9 +2,12 @@
 
     uv run python -m evals.run_evals                  # the backend .env selects
     uv run python -m evals.run_evals --backend gemini
+    uv run python -m evals.run_evals --model gemini-3.5-flash-lite   # Gemini with another model
     uv run python -m evals.run_evals --only parse     # scenarios whose id contains "parse"
 
-Prints a pass/fail table and a score, and exits non-zero when any scenario fails.
+Scenarios marked `"stable": true` have passed on every backend tried; they are skipped unless `--all` is
+given, to save time and free-tier quota. Prints a pass/fail table and a score, and exits non-zero when any
+scenario fails.
 """
 
 import argparse
@@ -185,8 +188,9 @@ def check_title_contains(answer, spec, ctx):
 
 
 def check_missing_includes(answer, spec, ctx):
+    """Each word must appear in the missing list; "bacon|pancetta" accepts either."""
     missing = " | ".join(recipes_of(answer)[0].missing).lower()
-    absent = [word for word in spec["words"] if word not in missing]
+    absent = [word for word in spec["words"] if not any(option in missing for option in word.split("|"))]
     return f"missing list {missing!r} lacks {absent}" if absent else None
 
 
@@ -302,19 +306,26 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--backend", choices=["mock", "gemini"], help="defaults to the one .env selects")
     parser.add_argument("--only", default="", help="run only scenarios whose id contains this")
+    parser.add_argument("--all", action="store_true", help="also run the scenarios marked stable")
+    parser.add_argument("--model", help="a Gemini API model to use instead of GEMINI_MODEL; implies --backend gemini")
     args = parser.parse_args()
     settings = config.load()
-    backend = args.backend or settings.backend
+    backend = "gemini" if args.model else args.backend or settings.backend
+    model = args.model or settings.gemini_model
     if backend == "gemini":
         if not settings.gemini_api_key:
             sys.exit("GEMINI_API_KEY is not set in .env.")
-        llm: LLM = Gemini(settings.gemini_api_key, settings.gemini_model)
+        llm: LLM = Gemini(settings.gemini_api_key, model)
     else:
         llm = Mock(delay=0)
     data = json.loads(SCENARIOS.read_text(encoding="utf-8"))
-    scenarios = [scenario for scenario in data["scenarios"] if args.only in scenario["id"]]
+    scenarios = [
+        scenario
+        for scenario in data["scenarios"]
+        if args.only in scenario["id"] and (args.all or not scenario.get("stable"))
+    ]
     results = run(llm, scenarios, data["kitchens"], date.today())
-    passed = report(results, backend if backend == "mock" else f"{backend} ({settings.gemini_model})")
+    passed = report(results, backend if backend == "mock" else f"{backend} ({model})")
     sys.exit(0 if passed == len(results) else 1)
 
 

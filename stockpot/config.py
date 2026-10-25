@@ -49,5 +49,5 @@ def load(env_file: Path = ROOT / ".env") -> Settings:
         db_path=db_path if db_path.is_absolute() else ROOT / db_path,
         llm=(values.get("STOCKPOT_LLM") or "mock").strip().lower(),
         gemini_api_key=(values.get("GEMINI_API_KEY") or "").strip(),
-        gemini_model=(values.get("GEMINI_MODEL") or "gemini-3.8-flash").strip(),
+        gemini_model=(values.get("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip(),
     )

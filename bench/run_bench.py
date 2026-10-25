@@ -49,6 +49,12 @@ class Client:
             self.cookie = cookie.split(";")[0]
         return response.status, json.loads(data) if data and data[:1] in b"[{" else data
 
+    def rest(self, seconds: float) -> None:
+        """Waits, letting go of the connection first so the server's keep-alive timeout can't drop it mid-request."""
+        if seconds:
+            self.conn.close()
+            time.sleep(seconds)
+
     def timed(self, method: str, path: str, body=None) -> float:
         started = time.perf_counter()
         status, _ = self.call(method, path, body)
@@ -146,7 +152,8 @@ def core_routes(client: Client, label: str) -> list[tuple]:
     return rows
 
 
-def ai_routes(client: Client, runs: int) -> list[tuple]:
+def ai_routes(client: Client, runs: int, pause: float) -> list[tuple]:
+    """Times each AI route, pausing `pause` seconds between rounds so a free-tier per-minute limit isn't hit."""
     rows = []
     parse, suggest, plan, cook = [], [], [], []
     for _ in range(runs):
@@ -158,6 +165,7 @@ def ai_routes(client: Client, runs: int) -> list[tuple]:
         _, planned = client.call("POST", "/api/recipes/plan", {"dish": "omelette"})
         plan.append(time.perf_counter() - started)
         cook.append(client.timed("POST", "/api/recipes/cooked", {"recipe": planned["recipe"]}))
+        client.rest(pause)
         for item in added:
             client.call("DELETE", f"/api/items/{item['id']}")
     rows += [
@@ -166,9 +174,11 @@ def ai_routes(client: Client, runs: int) -> list[tuple]:
         ("AI", "can I make it", *stats(plan)),
         ("AI", "I cooked this", *stats(cook)),
     ]
-    firsts, totals = zip(
-        *(client.chat("Long day, something warm please") for _ in range(max(3, runs // 2))), strict=True
-    )
+    chats = []
+    for _ in range(max(3, runs // 2)):
+        chats.append(client.chat("Long day, something warm please"))
+        client.rest(pause)
+    firsts, totals = zip(*chats, strict=True)
     rows += [("AI", "chat: first chunk", *stats(list(firsts))), ("AI", "chat: whole reply", *stats(list(totals)))]
     client.call("DELETE", "/api/chat")
     return rows
@@ -248,7 +258,8 @@ def main() -> None:
                     time.sleep(0.1)
             rows = core_routes(Client(port, "neal"), "seeded (17)")
             rows += core_routes(Client(port, "bulk"), "large (500)")
-            rows += ai_routes(Client(port, "neal"), runs=10 if backend == "mock" else 3)
+            mock = backend == "mock"
+            rows += ai_routes(Client(port, "neal"), runs=10 if mock else 3, pause=0 if mock else 15)
             together = concurrency(port)
         finally:
             stop(server)

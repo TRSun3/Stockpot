@@ -6,9 +6,11 @@ The evals check what the LLM actually says, scenario by scenario, with assertion
 uv run python -m evals.run_evals                  # the backend .env selects
 uv run python -m evals.run_evals --backend gemini
 uv run python -m evals.run_evals --only suggest   # scenarios whose id contains "suggest"
+uv run python -m evals.run_evals --model gemini-3.6-flash   # try another Gemini API model
+uv run python -m evals.run_evals --all             # include the stable scenarios
 ```
 
-It prints a pass/fail table with the reason for each failed check and a score, and exits non-zero when anything fails. `tests/test_evals.py` runs the whole suite on the mock as part of `uv run pytest`.
+It prints a pass/fail table with the reason for each failed check and a score, and exits non-zero when anything fails. Scenarios marked `"stable": true` have passed on every backend tried, so they are skipped unless `--all` is given, which saves time and free-tier quota. `tests/test_evals.py` runs every scenario, stable ones included, on the mock as part of `uv run pytest`.
 
 ## Scenarios
 
